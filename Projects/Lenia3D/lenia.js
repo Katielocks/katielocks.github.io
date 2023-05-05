@@ -216,4 +216,3 @@ setInterval(() => {
   grid = grid = golupdate(grid, kernel, frames_num, m, s)
   update(grid);
 }, 5000);
-
