@@ -62,21 +62,19 @@ function generateVoxel(grid) {
 
   // Apply a directional kernel to the input grid, and extract the indices and values of the non-zero elements
   const dirGrid = dir_kernel(grid);
-
-  const dirIndices = nonzero(tf.notEqual(dirGrid, 0))
+  const dirIndices = nonzero(dirGrid)
   const dirValues = tf.gatherND(dirGrid, dirIndices);
   // Convert the values into a binary representation of the direction in which the voxel should be extruded
-  const direction = tf.mod(tf.floorDiv(dirValues.expandDims(1), tf.pow(2, tf.range(5, -1, -1))), 2);
-  const directionReversed = tf.reverse(direction, [1]).cast('bool');
-  const face_indices  =  nonzero((tf.notEqual(directionReversed, false)));
+  let direction = tf.mod(tf.floorDiv(dirValues.expandDims(1), tf.pow(2, tf.range(5, -1, -1))), 2);
+  direction = tf.reverse(direction, [1]);
+  const face_indices  =  nonzero(direction);
   let faces = tf.gather(offsetFaces, face_indices.slice([0,1],[face_indices.shape[0], 1]).flatten()).cast('int32') ;
   const vertices_indices = face_indices.slice([0,0],[face_indices.shape[0], 1])
   const vertices = offset.gather(faces.flatten()).add(tf.gather(dirIndices, vertices_indices.tile([1,4]).flatten())).cast('int32');
 
-
   let verticesGrid = tf.zeros([grid.shape[0] + 1, grid.shape[1] + 1, grid.shape[2] + 1], 'int32');
   verticesGrid = tf.tensorScatterUpdate(verticesGrid,vertices, tf.ones([vertices.shape[0]], 'int32'));
-  const uniqueVertices = nonzero(tf.notEqual(verticesGrid, 0));
+  const uniqueVertices = nonzero(verticesGrid);
   verticesGrid = tf.tensorScatterUpdate(verticesGrid,uniqueVertices,  tf.range(0,uniqueVertices.shape[0],1, 'int32'));
   tf.gatherND(verticesGrid,vertices )
   faces = tf.reshape(tf.gatherND(verticesGrid,vertices ), [faces.shape[0], 4])
@@ -123,7 +121,6 @@ function roll(grid, axis, shift) {
 
   }
 function golupdate(grid, kernel, frames_num, m, s) {
-    console.log(grid.shape)
     const a  =tf.spectral.ifft(tf.mul(kernel, tf.spectral.fft(grid.cast('complex64'))))
     const U = tf.real(tf.spectral.ifft(tf.mul(kernel, tf.spectral.fft(grid.cast('complex64'))))).reshape(grid.shape);
     const A = tf.add(grid,tf.div(growth(U, m, s), frames_num)).clipByValue(0, 1)
@@ -137,40 +134,19 @@ function golupdate(grid, kernel, frames_num, m, s) {
   
 
   function nonzero(t) {
-    let a = t.as1D()
-    
-    const b = tf.cast(a, 'bool')
-    let helper = b.logicalAnd(tf.cast(tf.ones([a.size]), 'bool'))
-    const n = helper.sum().dataSync()[0]
-    const noNull = []
-    for(let i = 0; i < n ; i++) {
-      let ind = tf.argMax(helper)
-      let s = ind.dataSync()[0]
-      noNull.push(tf.argMax(helper).dataSync()[0])
-      if (s === 0) {
-         const [x, y] = helper.split([1, helper.size - 1])
-         helper = tf.concat([tf.tensor1d([0]), y])
-      } else if (s === helper.size) {
-        const [x, y] = helper.split([helper.size -1, 1])
-        helper = tf.concat([x, tf.tensor1d([0])])
-      } else {
-        const [x, _, y] = helper.split([s, 1, helper.size - s - 1])
-        helper = tf.concat([x,tf.tensor1d([0]), y])
-      }
+    let values = tf.notEqual(t.flatten(),0).dataSync()
+    let indices = Array.from(values.keys()).filter(i => values[i] !== 0)
+    indices = tf.tensor(indices,shape =[indices.length,1] ,dtype='int32');
+    let dim = indices 
+    for (let index = 0; index < t.shape.length-1; index++) {
+      const element = t.shape[index];
+      dim = tf.floorDiv(dim,element)
+      indices = tf.concat([dim,indices],axis=1)
     }
-    
-    const indexToCoords = (index, shape) => {
-      const pseudoShape = shape.map((a, b, c) => c.slice(b + 1).reduce((a, b) => a * b, 1))
-      let coords = []
-      let ind = index
-      for (let i = 0; i < shape.length; i++) {
-        coords.push(Math.floor(ind / pseudoShape[i]))
-        ind = ind % pseudoShape[i]
-      }
-      return coords
-    }
-    const coords = noNull.map(e => indexToCoords(e, t.shape))
-    return tf.tensor(coords).cast('int32')}
+    indices = tf.mod(indices, tf.tensor(t.shape))
+    return indices.cast('int32')
+  
+  }
     
 
 
@@ -181,13 +157,15 @@ function golupdate(grid, kernel, frames_num, m, s) {
   document.body.appendChild( renderer.domElement );
 
 
-const grid_size = 2
+const grid_size = 10
       const m = 0.15
       const s = 0.05
       const frames_num = 10
       const radius = 12
 let grid = tf.randomUniform([grid_size,grid_size,grid_size],0,1,'float32')
+console.log("grid gen") 
 let mesh_attributes =  generateVoxel(grid)
+console.log("mesh gen")
 let geometry = new THREE.BufferGeometry();
 geometry.setIndex(mesh_attributes.faces.flatten().arraySync());
 geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(mesh_attributes.vertices.flatten().arraySync()), 3));
@@ -218,9 +196,13 @@ function update(up_grid) {;
   const colors = new Float32Array(up_mesh_attributes.face_colours.arraySync());
 
   const geometry = mesh.geometry; // Get the existing geometry
+  
+  mesh.geometry.dispose();
+
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   geometry.setIndex(up_mesh_attributes.faces.flatten().arraySync());
+
 
   geometry.attributes.position.needsUpdate = true;
   geometry.attributes.color.needsUpdate = true;
@@ -234,3 +216,4 @@ setInterval(() => {
   grid = grid = golupdate(grid, kernel, frames_num, m, s)
   update(grid);
 }, 5000);
+
