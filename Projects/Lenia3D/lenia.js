@@ -181,7 +181,7 @@ function golupdate(grid, kernel, frames_num, m, s) {
   document.body.appendChild( renderer.domElement );
 
 
-const grid_size = 2
+const grid_size = 50
       const m = 0.15
       const s = 0.05
       const frames_num = 10
