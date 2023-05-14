@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "@tensorflow/tfjs": "^4.4.0",
+    "three": "^0.152.2"
+  },
+  "devDependencies": {
+    "vite": "^4.3.4"
+  }
+}
