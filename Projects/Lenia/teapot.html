@@ -1,0 +1,52 @@
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Babylon.js OBJ Viewer</title>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="babylon.objFileLoader.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+  </head>
+  <body>
+    <canvas id="renderCanvas"></canvas>
+    <script>
+      var canvas = document.getElementById("renderCanvas");
+      var engine = new BABYLON.Engine(canvas, true);
+
+      var scene = new BABYLON.Scene(engine);
+
+      var camera = new BABYLON.ArcRotateCamera(
+        "Camera",
+        -Math.PI / 2,
+        Math.PI / 2,
+        5,
+        BABYLON.Vector3.Zero(),
+        scene
+      );
+      camera.attachControl(canvas, true);
+
+      BABYLON.SceneLoader.ImportMesh(
+        "",
+        "./",
+        "teapot.obj",
+        scene,
+        function(meshes) {
+          var material = new BABYLON.StandardMaterial("material", scene);
+          material.diffuseColor = new BABYLON.Color3(0.5, 0.5, 0.5);
+          material.specularColor = new BABYLON.Color3(0.2, 0.2, 0.2);
+          material.emissiveColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+
+          meshes.forEach(function(mesh) {
+            mesh.material = material;
+          });
+
+          meshes[0].position = new BABYLON.Vector3(0, 0, 0);
+          meshes[0].rotation = new BABYLON.Vector3(0, Math.PI, 0);
+
+          engine.runRenderLoop(function() {
+            scene.render();
+          });
+        }
+      );
+    </script>
+  </body>
+</html>

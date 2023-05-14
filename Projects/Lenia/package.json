@@ -1,5 +1,9 @@
 {
   "dependencies": {
-    "babylonjs": "^6.1.0"
+    "babylonjs": "^6.1.0",
+    "three": "^0.152.2"
+  },
+  "devDependencies": {
+    "vite": "^4.3.3"
   }
 }

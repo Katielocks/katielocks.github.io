@@ -19,6 +19,78 @@
         height: 100%;
         touch-action: none;
       }
+
+      #title-menu {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        z-index: 1;
+      }
+
+      #title-menu label,
+      #title-menu input {
+        display: block;
+        margin-bottom: 10px;
+      }
+      body {
+			font-family: Arial, sans-serif;
+			background-color: #f7f7f7;
+			color: #333;
+			margin: 0;
+			padding: 0;
+		}
+		
+		.splash {
+			position: fixed;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			background-color: #333;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			z-index: 9999;
+		}
+		
+		h1 {
+			font-size: 32px;
+			margin-bottom: 20px;
+			color: #fff;
+			text-align: center;
+		}
+		
+		label {
+			display: block;
+			margin-bottom: 10px;
+			font-size: 16px;
+			color: #fff;
+		}
+		
+		input[type="text"],
+		input[type="range"] {
+			padding: 10px;
+			border: 1px solid #ccc;
+			border-radius: 4px;
+			width: 100%;
+			margin-bottom: 20px;
+			font-size: 16px;
+			box-sizing: border-box;
+		}
+		
+		button {
+			padding: 10px 20px;
+			background-color: #008cba;
+			color: #fff;
+			border: none;
+			border-radius: 4px;
+			font-size: 16px;
+			cursor: pointer;
+		}
+		
+		button:hover {
+			background-color: #0077a3;
+		}
     </style>
 
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
@@ -27,6 +99,48 @@
   </head>
 
   <body>
+    <div class="splash">
+      <div>
+        <h1>Welcome to My App</h1>
+        <form>
+          <label for="seed">Seed:</label>
+          <input type="text" id="seed" name="seed" placeholder="Enter an integer seed" style="color: #333;">
+          
+          <label for="grid_size" style="color: #fff;">Grid Size:</label>
+          <input type="range" id="grid_size" name="grid_size" min="1" max="10" value="5" style="color: #333;">
+          
+          <button type="button" onclick="start()">Start</button>
+        </form>
+      </div>
+    </div>
+    
+    <script>
+      function start() {
+        const seedInput = document.getElementById("seed").value;
+        const gridSizeInput = document.getElementById("grid_size").value;
+        
+        const seed = parseInt(seedInput, 10);
+        const gridSize = parseInt(gridSizeInput, 10);
+        
+        if (!Number.isInteger(seed) || !Number.isInteger(gridSize)) {
+          alert("Please enter integer values for Seed and Grid Size");
+          return;
+        }
+        
+        // do something with the seed and gridSize values
+        
+        // close the splash screen
+        document.body.removeChild(document.querySelector(".splash"));
+      }
+    </script>
+    <div id="title-menu">
+      <label for="seed-input">Seed:</label>
+      <input type="number" id="seed-input" min="1" max="100" value="1">
+      <br>
+      <label for="grid-size-slider">Grid Size:</label>
+      <input type="range" id="grid-size-slider" min="20" max="50" value="20">
+    </div>
+
     <canvas id="renderCanvas" touch-action="none"></canvas>
     <!-- touch-action="none" for best results from PEP -->
 
@@ -43,6 +157,19 @@
         const camera = new BABYLON.ArcRotateCamera("camera", -Math.PI / 2, Math.PI / 2.5, 15, new BABYLON.Vector3(0, 0, 0));
         camera.attachControl(canvas, true);
         const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(1, 1, 0));
+
+        const seedInput = document.getElementById("seed-input");
+        const gridSizeSlider = document.getElementById("grid-size-slider");
+
+        seedInput.addEventListener("input", function () {
+          const seed = parseInt(seedInput.value);
+          // Update the scene with the new seed value
+        });
+
+        gridSizeSlider.addEventListener("input", function () {
+          const gridSize = parseInt(gridSizeSlider.value);
+          // Update the scene with the new grid size value
+        });
 
         return scene;
       };
