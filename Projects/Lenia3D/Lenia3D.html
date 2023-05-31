@@ -1,23 +1,72 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="UTF-8">
+<head>
     <title>LENIA3D</title>
-    <style>
-      body {
-        margin: 0;
-      }
-      canvas {
-        display: block;
-      }
-    </style>
-  </head>
-  <body>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r132/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-    <script src="lenia.js"></script>
-  </body>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="menu">
+    <ul>
+      <li><a href="#">Parameters</a></li>
+      <li><a href="#">Generation</a></li>
+      <li><a href="#">Life</a></li>
+      <li><a href="#">Visual</a></li>
+    </ul>
+  </div>
+
+  <div class="container">
+    
+    <div class="play-controls">
+        <button class="button play-button" id="startstop"></button>
+        <button class="button reset-button" id ="reset"></button>
+    </div>
+    <label for="grid size">Grid Size:</label>
+    <input type="range" id="gridsize-slider" min="10" max="100" step="2">
+    <div id = "gridsize"> 0</div>
+      <label for="radius">R:    </label>
+      <div class="parameter-control">
+      <button class="button reset-button" id="radius-sub-button"></button>
+      <div id="radius"> 0</div>
+      <button class="button reset-button" id="radius-add-button"></button>
+    </div>
+      <label for="Time resolution">T:   </label>
+      <div class="parameter-control">
+      <button class="button reset-button" id="time-sub-button"></button>
+      <div id="time"> 0</div>
+      <button class="button reset-button" id="time-add-button"></button>
+    </div>
+    <br>
+      <label for="gamma">G:    </label>
+      <div class="parameter-control">
+      <button class="button reset-button" id="mu-sub-button"></button>
+      <div id="gamma">0</div>
+      <button class="button reset-button" id="mu-add-button"></button>
+    </div>
+      <label for="mu">M:    </label>
+      <div class="parameter-control">
+      <button class="button reset-button" id="sigma-sub-button"></button>
+      <div id="mu">0</div>
+      <button class="button reset-button" id="sigma-add-button"></button>
+    </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <h2>Generation</h2>
+  </div>
+
+  <div class="container">
+    <h2>Life</h2>
+  </div>
+
+  <div class="container">
+    <h2>Visual</h2>
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r132/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+  <script src = "lenia.js"></script>
+</body>
 </html>
 
 
