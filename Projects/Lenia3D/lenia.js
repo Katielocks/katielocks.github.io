@@ -1,114 +1,167 @@
-
+tf.setBackend('webgl')
 function dir_kernel(grid) {
 
-  /**
-  * Use a 3D edge detection kernel to derive number and position of voxel faces.
- * @param {tf.Tensor} grid - A 3D TensorFlow.js tensor.
- * @returns {tf.Tensor} dir_grid - Filtered TensorFlow.js tensor with values representing the number and direction of voxel faces.
- */
-
- // Convert the grid to a boolean tensor and add two dimensions to make it compatible with the convolution operation
- grid = tf.reshape(grid,[1,grid.shape[0],grid.shape[1],grid.shape[2],1]).cast('bool')
-
  // Define the weights of the directional kernel
+ return tf.tidy(() => {let boolgrid = tf.notEqual(grid,0).cast('int32')
  const kern_weights = tf.tensor([
         [[ 0, 0, 0],
-        [ 0, -4, 0],
+        [ 0, -1, 0],
         [ 0, 0, 0]],
-       [[    0,   -32,     0],
-        [   -1, 63,   -8],
-        [    0,   -16,     0]],
+       [[    0,   -1,     0],
+        [   -1, 6,   -1],
+        [    0,   -1,     0]],
 
        [[ 0,     0, 0],
-        [    0,    -2,     0],
+        [    0,    -1,     0],
         [ 0,     0, 0]]], [3, 3, 3], 'int32');
  const kernel = tf.reshape(kern_weights, [3, 3, 3, 1, 1])
- const dir_grid =  tf.clipByValue(tf.conv3d(grid, kernel, [1, 1, 1,1,1], 'same'), 0, Infinity).cast('int32');
  // Remove the extra dimensions and return the edge detected grid
- return tf.reshape(dir_grid,[grid.shape[1],grid.shape[2],grid.shape[3]]);
+ let dirgrid = tf.conv3d(tf.reshape(boolgrid,[1,grid.shape[0],grid.shape[1],grid.shape[2],1]), kernel, [1,1,1,1,1], 'same').reshape(grid.shape)
+ return  dirgrid.clipByValue(0,1).cast('int32')});
 }
 
-function generateVoxel(grid) {
-  /**
-   * Generate cuboid voxel mesh of a given 3D grid.
-   * @param {Array} grid - A 3D array representing the input grid.
-   * @returns {Object} A dictionary containing:
-   * - vertices: A 2D array of shape (N, 3) representing the unique vertices of the voxel geometry.
-   * - faces: A 2D array of shape (M, 4) representing the faces of the voxel geometry, where each row is a set of indices into the vertices tensor.
-   * - face_values: A 1D array of length M representing the value of each face of the voxel geometry, taken from the corresponding index in the input grid.
-   */
 
-  // Define the eight vertices of a cube with an offset tensor
-  const offset = tf.tensor([
-    [0, 0, 0], // vertex 0
-    [1, 0, 0], // vertex 1
-    [1, 1, 0], // vertex 2
-    [0, 1, 0], // vertex 3
-    [0, 0, 1], // vertex 4
-    [1, 0, 1], // vertex 5
-    [1, 1, 1], // vertex 6
-    [0, 1, 1], // vertex 7
-  ]);
-
-  // Define the faces of the cube as offsets into the vertex tensor
-  const offsetFaces = tf.tensor([
-    [0, 1, 2, 3], // face 0
-    [1, 5, 6, 2], // face 1
-    [4, 0, 3, 7], // face 2
-    [5, 4, 7, 6], // face 3
-    [3, 2, 6, 7], // face 4
-    [4, 5, 1, 0], // face 5
-  ]);
-
-  // Apply a directional kernel to the input grid, and extract the indices and values of the non-zero elements
-  const dirGrid = dir_kernel(grid);
-  const dirIndices = nonzero(dirGrid)
-  const dirValues = tf.gatherND(dirGrid, dirIndices);
-  // Convert the values into a binary representation of the direction in which the voxel should be extruded
-  let direction = tf.mod(tf.floorDiv(dirValues.expandDims(1), tf.pow(2, tf.range(5, -1, -1))), 2);
-  direction = tf.reverse(direction, [1]);
-  const face_indices  =  nonzero(direction);
-  let faces = tf.gather(offsetFaces, face_indices.slice([0,1],[face_indices.shape[0], 1]).flatten()).cast('int32') ;
-  const vertices_indices = face_indices.slice([0,0],[face_indices.shape[0], 1])
-  const vertices = offset.gather(faces.flatten()).add(tf.gather(dirIndices, vertices_indices.tile([1,4]).flatten())).cast('int32');
-
-  let verticesGrid = tf.zeros([grid.shape[0] + 1, grid.shape[1] + 1, grid.shape[2] + 1], 'int32');
-  verticesGrid = tf.tensorScatterUpdate(verticesGrid,vertices, tf.ones([vertices.shape[0]], 'int32'));
-  const uniqueVertices = nonzero(verticesGrid);
-  verticesGrid = tf.tensorScatterUpdate(verticesGrid,uniqueVertices,  tf.range(0,uniqueVertices.shape[0],1, 'int32'));
-  tf.gatherND(verticesGrid,vertices )
-  faces = tf.reshape(tf.gatherND(verticesGrid,vertices ), [faces.shape[0], 4])
-  const values = tf.gatherND(grid,dirIndices)
-  const face_values = values.gather(vertices_indices).tile([1,18]).flatten()
-  const face_colours = face_values.expandDims(0).transpose().pad([[0, 0],[1,1]]).flatten()
-  faces =  generateTriangles(faces)
-  const vertices2 = tf.add(uniqueVertices,tf.mul(tf.div(tf.tensor(grid.shape),2).expandDims(0).tile([uniqueVertices.shape[0],1]),-1))
-  return {
-    vertices :vertices2,
-    faces,
-    face_colours
-  };
+function updatescalar(indices,scalar){
+  for (let index = 0; index < indices.length; index++) {
+    const local = indices[index]
+    let meshindex = local[2]+grid.shape[0]*local[1]+local[0]*grid.shape[0]*grid.shape[1]
+    mesh.getMatrixAt(meshindex, cubeProxy.matrix)
+    cubeProxy.position.set(local[0]-offset[0], local[1]-offset[1], local[2]-offset[2]);
+    cubeProxy.scale.setScalar(scalar)
+    cubeProxy.updateMatrix()
+    mesh.setMatrixAt(meshindex, cubeProxy.matrix)
+  }
 }
-function generateTriangles(shapes) {
-  const [a,b,c,d] = tf.split(shapes,[1,1,1,1],1)
-  const triangles = tf.concat([a,b,c,a,c,d],1).reshape([2*shapes.shape[0],3])
 
-  return triangles;
+function updatevalues(indices,values){
+for (let index = 0; index < indices.length; index++) {
+  const local = indices[index]
+  let meshindex = local[2]+grid.shape[0]*local[1]+local[0]*grid.shape[0]*grid.shape[1]
+  mesh.setColorAt(meshindex, new THREE.Color(0, values[index], 0));
+}}
+
+function generateseed() {
+  seed = Math.floor(Math.random() * Math.pow(10, 8));
 }
+
+function generateVoxelgrid() {
+mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial(), grid.shape.reduce((a, v) => a * v))
+offset = [grid.shape[0] / 2 - 0.5, grid.shape[1] / 2 - 0.5, grid.shape[2] / 2 - 0.5];
+  for (let i = 0; i < grid.shape[0]; i++) {
+    for (let j = 0; j < grid.shape[1]; j++) {
+      for (let k = 0; k < grid.shape[2]; k++) {
+    cubeProxy.position.set(i-offset[0], j-offset[1], k-offset[2]);
+    cubeProxy.scale.setScalar(0)
+    cubeProxy.updateMatrix()
+    const index = k+grid.shape[0]*j+i*grid.shape[0]*grid.shape[1]
+    mesh.setMatrixAt(index, cubeProxy.matrix)
+  }}}
+  mesh.setColorAt(0, new THREE.Color(0, 0, 0));
+  scene.add(mesh);
+}
+async function  resetVoxelGrid() {
+  generategrid()
+  updateVoxelGrid()
+}
+
+
+async function  updateVoxelGrid() {
+    let new_dir_grid = tf.tidy(() => {return dir_kernel(grid).cast('float32')})
+    const diffgrid = tf.sub(new_dir_grid,dirGrid)
+    // Cells to be deleted
+    const delgrid = tf.equal(diffgrid,-1)
+    let deldirIndices = await tf.whereAsync(delgrid)
+    let delIndex = deldirIndices.arraySync()
+
+    // Cells to be who face array needs to be Updated
+    // Cells Generated
+    const newgrid = tf.equal(diffgrid,1)
+    let newdirIndices = await tf.whereAsync(newgrid)
+    let newIndex  = newdirIndices.arraySync()
+    let cellgrid = tf.notEqual(new_dir_grid,0)
+    let cellindices = await tf.whereAsync(cellgrid)
+    const cellvalues = tf.gatherND(grid, cellindices)
+    let values = cellvalues.arraySync()
+    cellIndex = cellindices.arraySync()
+    // Update the cells that are generated
+    updatescalar(newIndex,1)
+    updatescalar(delIndex,0)
+    updatevalues(cellIndex,values)
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.instanceColor.needsUpdate = true;
+    dirGrid.assign(new_dir_grid);
+    tf.dispose([
+      deldirIndices,
+      newdirIndices,
+      cellindices,
+      cellvalues,
+      diffgrid,
+      new_dir_grid,
+      delgrid,
+      newgrid,
+      cellgrid
+    ]);
+  }
+
+function transposecomplex(tensor,perms){
+  return tf.tidy(()=>{
+    const size = perms.map(index => tensor.shape[index])
+    let real = tf.real(tensor).reshape(size).transpose(perms)
+    let imag = tf.imag(tensor).reshape(size).transpose(perms)
+    return tf.complex(real,imag)
+  })
+  }
+
+function fft1(tensor,perms){
+  return  tf.tidy(() => {
+    let fttensor = tf.spectral.fft(tensor.transpose(perms))
+return transposecomplex(fttensor,perms)})}
+
+function fftn(tensor){
+  return tf.tidy(() => {
+let perms = tf.range(0,tensor.shape.length,1).arraySync()
+let fttensor = tf.tidy(() => {return fft1(tensor,perms)})
+for (let i=1;i<perms.length;i++){
+const size = perms.length-1
+const permsi = perms.slice();
+[permsi[size],permsi[size-i]] = [permsi[size-i],permsi[size]];
+fttensor = tf.tidy(() => {return fft1(fttensor,permsi)})}
+return fttensor
+})}
+
+function ifft1(tensor,perms){
+return  tf.tidy(() => {
+let fttensor = tf.spectral.ifft(tensor.transpose(perms))
+return transposecomplex(fttensor,perms)})}
+
+function ifftn(tensor){
+return tf.tidy(() => {
+let perms = tf.range(0,tensor.shape.length,1).arraySync()
+let fttensor = tf.tidy(() => {return ifft1(tensor,perms)})
+for (let i=1;i<perms.length;i++){
+const size = perms.length-1
+const permsi = perms.slice();
+[permsi[size],permsi[i-1]] = [permsi[i-1],permsi[size]];
+fttensor = tf.tidy(() => {return ifft1(fttensor,permsi)})
+}
+return fttensor})}
 
 function generate_kernel(radius, grid_size) {
-
+  kernel =   tf.tidy(() => {
   const mid = Math.floor(grid_size/2);
   const bell = (x, m, s) => tf.exp(tf.neg(tf.pow(tf.div(tf.sub(x, m), s), 2)).div(2));
   const x = tf.range(-mid, mid,1);
-  const [X, Y] = tf.meshgrid(x, x);
-  const D = tf.div(tf.sqrt(tf.add(tf.pow(X.expandDims(0).tile([grid_size,1, 1]), 2), tf.add(tf.pow(X.expandDims(0).tile([grid_size,1, 1]).transpose(), 2), tf.pow(Y.expandDims(0).tile([grid_size,1, 1]), 2)))), radius);
+  let [X, Y] = tf.meshgrid(x, x);
+  X = X.expandDims(0).tile([X.shape[0],1, 1]);
+  Y = Y.expandDims(0).tile([Y.shape[0],1, 1])
+  const Z = X.transpose();
+  const D = tf.div(tf.sqrt(tf.add(tf.add(tf.pow(X, 2), tf.pow(Y, 2)), tf.pow(Z, 2))), radius);
   const K = tf.mul(tf.cast(tf.less(D, 1), 'float32'), bell(D, 0.5, 0.15));
-  const fK = tf.spectral.fft(roll(K.div(tf.sum(K)), [0,1,2], [grid_size/2,grid_size/2,grid_size/2]).cast('complex64'));
-  return fK;
+  return fftn(roll(K.div(tf.sum(K)), [0,1,2], [mid,mid,mid]).cast('complex64'))})
   }
   
 function roll(grid, axis, shift) {
+  return tf.tidy(() => {
   const grid_size = tf.tensor(grid.shape).gather(axis).dataSync();
   const limits = [grid_size[0]-shift[0], grid_size[1]-shift[1], grid_size[2]-shift[2]];
   const [a1, b1] = tf.split(grid, [limits[0], shift[0]], axis[0]);
@@ -116,38 +169,36 @@ function roll(grid, axis, shift) {
   const [a2, b2] = tf.split(x1, [limits[1], shift[1]], axis[1]);
   const x2 = tf.concat([b2,a2],axis[1])
   const [a3, b3] = tf.split(x2, [limits[2], shift[2]], axis[2]);
-  const x3 = tf.concat([b3,a3],axis[2])
-  return x3;
+  return  tf.concat([b3,a3],axis[2])})
+  }
 
-  }
-function golupdate(grid, kernel, frames_num, m, s) {
-    const a  =tf.spectral.ifft(tf.mul(kernel, tf.spectral.fft(grid.cast('complex64'))))
-    const U = tf.real(tf.spectral.ifft(tf.mul(kernel, tf.spectral.fft(grid.cast('complex64'))))).reshape(grid.shape);
-    const A = tf.add(grid,tf.div(growth(U, m, s), frames_num)).clipByValue(0, 1)
-    return A
-  }
-  
-  function growth(U, m, s) {
-    const bell = (x, m, s) => tf.sub(tf.exp(tf.neg(tf.pow(tf.div(tf.sub(x, m), s), 2)).div(2)), 0.5);
-    return tf.sub(tf.pow(bell(U, m, s), 2), 1);
-  }
-  
 
-  function nonzero(t) {
-    let values = tf.notEqual(t.flatten(),0).dataSync()
-    let indices = Array.from(values.keys()).filter(i => values[i] !== 0)
-    indices = tf.tensor(indices,shape =[indices.length,1] ,dtype='int32');
-    let dim = indices 
-    for (let index = 0; index < t.shape.length-1; index++) {
-      const element = t.shape[index];
-      dim = tf.floorDiv(dim,element)
-      indices = tf.concat([dim,indices],axis=1)
+  function golupdate() {  
+    const dummy  = tf.tidy(() => {
+    const U = tf.real(ifftn(tf.mul(kernel,fftn(grid.cast('complex64'))))).reshape(grid.shape)
+     return tf.add(grid,tf.div(tf.tidy(()=> { return growth(U, m, s)}), T)).clipByValue(0, 1)})
+    grid.assign(dummy)
+    dummy.dispose()
     }
-    indices = tf.mod(indices, tf.tensor(t.shape))
-    return indices.cast('int32')
-  
+  function growth(U, m, s) {
+    return tf.tidy(() => { return tf.sub(tf.mul(tf.exp(tf.sub(0,tf.div(U.sub(m).div(s).pow(2),2))),2),1)})
   }
+  
+  function initGrid(){
+    grid = tf.tidy(() => {return tf.variable(tf.zeros([grid_size,grid_size,grid_size]).cast('float32'))})
+  }
+  function initdirGrid(){
+    dirGrid = tf.tidy(() => {return tf.variable(tf.zeros(grid.shape).cast('float32'))})
+  }
+
+  function generategrid(){
     
+    if (seed == null){generateseed()}
+    const mid = Math.floor((grid_size -cluster_size)/ 2)
+    new_grid = tf.tidy(() => {return tf.variable(tf.pad(tf.randomUniform([cluster_size,cluster_size,cluster_size], 0, 1, 'float32', seed),[[mid,mid],[mid,mid],[mid,mid]]).cast('float32'))})
+
+    grid.assign(new_grid)
+    new_grid.dispose()}
 
 
   const scene = new THREE.Scene();
@@ -157,62 +208,244 @@ function golupdate(grid, kernel, frames_num, m, s) {
   document.body.appendChild( renderer.domElement );
 
 
-const grid_size = 10
-      const m = 0.15
-      const s = 0.05
-      const frames_num = 10
-      const radius = 12
-let grid = tf.randomUniform([grid_size,grid_size,grid_size],0,1,'float32')
-console.log("grid gen") 
-let mesh_attributes =  generateVoxel(grid)
-console.log("mesh gen")
-let geometry = new THREE.BufferGeometry();
-geometry.setIndex(mesh_attributes.faces.flatten().arraySync());
-geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(mesh_attributes.vertices.flatten().arraySync()), 3));
-geometry.setAttribute( 'color', new THREE.Float32BufferAttribute(mesh_attributes.face_colours.arraySync(), 3 ) );
-let material = new THREE.MeshBasicMaterial( { vertexColors: true } );
-let mesh = new THREE.Mesh(geometry, material);
-scene.add(mesh)
-
-camera.position.x = 2*grid_size;
-camera.position.y = 2*grid_size;
-camera.position.z = 2*grid_size;
-
-  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+      let grid_size = 50
+      let cluster_size = 20
+      let m = 0.15
+      let s = 0.017
+      let T = 10
+      let radius = 12
+let seed = null
+let grid = null, dirGrid = null, kernel = null, mesh = null, offset = null, cubeProxy = new THREE.Object3D()
+initGrid()
+initdirGrid()
+generategrid()
+generateVoxelgrid()
+generate_kernel(radius, grid_size)
+updateVoxelGrid() 
+camera.position.x = 2*cluster_size ;
+camera.position.y = 2*cluster_size ;
+camera.position.z = 2*cluster_size ;
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; 
 controls.dampingFactor = 0.05; // Set the damping factor for the damping effect
-camera.position.z = 5;
+scene.background = new THREE.Color(0x101214);
 const animate = function () {
   requestAnimationFrame( animate );
   controls.update(); // Update controls
   renderer.render( scene, camera );
 };
+animate();
+let isRunning = false; // Variable to hold the interval ID
 
-const kernel = generate_kernel(radius, grid_size);
+function animatestate() {
+  if (isRunning) {
+    // Update the grid every 1/T seconds
+    setTimeout(function() {
+        golupdate();
+        updateVoxelGrid()
+        animatestate();
+      }, Math.floor(1000/T))
 
-function update(up_grid) {;
-  let up_mesh_attributes = generateVoxel(up_grid);
-  const positions = new Float32Array(up_mesh_attributes.vertices.flatten().arraySync());
-  const colors = new Float32Array(up_mesh_attributes.face_colours.arraySync());
-
-  const geometry = mesh.geometry; // Get the existing geometry
-  
-  mesh.geometry.dispose();
-
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  geometry.setIndex(up_mesh_attributes.faces.flatten().arraySync());
-
-
-  geometry.attributes.position.needsUpdate = true;
-  geometry.attributes.color.needsUpdate = true;
-  geometry.index.needsUpdate = true;
-  return up_grid;
+    // Render your game objects here
+  }
 }
 
-animate();
+// Function to start the game
+function startstate() {
+isRunning = true;
+animatestate();
+}
 
-setInterval(() => {
-  grid = grid = golupdate(grid, kernel, frames_num, m, s)
-  update(grid);
-}, 5000);
+// Function to stop the game
+function stopstate() {
+isRunning = false;
+}
+
+function updatestate() {
+  if (isRunning) {
+    stopstate();
+  } else {
+    startstate();
+  }
+}
+// Event listener for keydown event
+document.addEventListener("keydown", (event) => {
+  if (event.code === "Space") {
+    updatestate();
+  }
+  
+});;
+
+document.addEventListener('DOMContentLoaded', function() {
+  var menuItems = document.querySelectorAll('.menu li a');
+  var containers = document.querySelectorAll('.container');
+
+  menuItems.forEach(function(item, index) {
+    item.addEventListener('click', function(e) {
+      e.preventDefault();
+      var container = containers[index];
+
+      if (container.style.display === 'block') {
+        container.style.display = 'none';
+      } else {
+        containers.forEach(function(c) {
+          c.style.display = 'none';
+        });
+        container.style.display = 'block';
+      }
+    });
+  });
+});
+// Get the DOM elements for display
+const gridsizecounter = document.getElementById("gridsize");
+const radiuscounter = document.getElementById("radius");
+const timecounter = document.getElementById("time");
+const mucounter = document.getElementById("mu");
+const sigmacounter = document.getElementById("sigma");
+const seedinput = document.getElementById("seedinput");
+const seedbutton = document.getElementById("seed-button");
+const seeddisplay = document.getElementById("seed");
+// Get the buttons for adding and subtracting
+const gridsizeslider = document.getElementById("gridsize-slider");
+const radiusAddButton = document.getElementById("radius-add-button");
+const radiusSubButton = document.getElementById("radius-sub-button");
+const timeAddButton = document.getElementById("time-add-button");
+const timeSubButton = document.getElementById("time-sub-button");
+const muslider = document.getElementById("mu-slider");
+const sigmaslider = document.getElementById("sigma-slider");
+const startstop = document.getElementById("startstop");
+const reset = document.getElementById("reset");
+let new_grid_size = grid_size
+let gridrange = [2,100,49]
+let rrange = [0,100,100]
+let trange = [0,20,20]
+updategridsize();
+updateradius();
+updatet();
+updatem();
+updates();
+updateseed();
+gridsizeslider.value = grid_size
+muslider.value = m
+sigmaslider.value = s
+// Add event listeners to the buttons
+gridsizeslider.addEventListener("change", () => {
+  new_grid_size = gridsizeslider.value
+  updategridsize();
+});
+radiusAddButton.addEventListener("click", () => {
+  radius = inc(radius, rrange,1)
+  updateradius();
+});
+
+radiusSubButton.addEventListener("click", () => {
+  radius = inc(radius, rrange,-1)
+  updateradius();
+});
+
+timeAddButton.addEventListener("click", () => {
+  T = inc(T, trange,1)
+  updatet();
+});
+
+timeSubButton.addEventListener("click", () => {
+  T = inc(T, trange,-1)
+  updatet();
+});
+
+muslider.addEventListener("change", () => {
+  m  = parseFloat(muslider.value) 
+  updatem();
+});
+
+sigmaslider.addEventListener("change", () => {
+  s  = parseFloat(sigmaslider.value)
+  updates();
+});
+
+reset.addEventListener("click", () => {
+  resetVoxelGrid();
+});
+  function updategridsize() {
+    let padding  = (new_grid_size-grid_size)/2
+    prevstate = isRunning
+    if (padding != 0) { 
+      stopstate()
+    if (padding > 0) {
+
+      new_grid = tf.tidy(() => {return tf.variable(tf.pad(grid,[[padding,padding],[padding,padding],[padding,padding]]))})
+      new_dir_grid = tf.tidy(() => {return tf.variable(tf.zeros(new_grid.shape).cast('int32'))})}
+    else { 
+      padding = -padding
+      new_grid = tf.tidy(()=>{return tf.variable(grid.slice([padding,padding,padding],[grid_size-padding-1,grid_size-padding-1,grid_size-padding-1]))})
+      new_dir_grid = tf.tidy(() => {return tf.variable(tf.zeros(new_grid.shape).cast('int32'))})}
+    tf.dispose([grid,dirGrid])
+    grid = tf.variable(new_grid.clone()); dirGrid = tf.variable(new_dir_grid.clone())
+    tf.dispose([new_grid,new_dir_grid])
+    scene.remove(mesh)
+    mesh.dispose()
+    generateVoxelgrid()
+    updateVoxelGrid()
+    scene.add(mesh)
+    grid_size = new_grid_size   
+    generate_kernel(radius, grid_size)
+    }gridsizecounter.textContent = grid_size
+    if (prevstate) {startstate()};
+  }
+function updateradius() {
+  radiuscounter.textContent = radius.toFixed(0);
+}
+
+function updatet() {
+  timecounter.textContent = T.toFixed(0);
+}
+
+function updatem() {  
+  mucounter.textContent = m
+}
+
+function updates() {
+  sigmacounter.textContent = s
+}
+startstop.addEventListener("click", () => {
+  updatestate()
+  if (isRunning) {
+    startstop.style.backgroundImage = "url('pausebutton.png')";
+  } else {
+    startstop.style.backgroundImage = "url('startbutton.png')";;
+  }
+});
+
+function validateSeedInput(input) {
+  // Remove any non-numeric characters from the input value
+  input.value = input.value.replace(/\D/g, '');
+  input.value = input.value.slice(0, 8);
+}
+
+
+function inc(value, increments,dir) {
+  const range = increments[1] - increments[0]; // Calculate the range
+  const step = dir*range / increments[2]; // Calculate the step size
+    const nextValue = value + step; // Calculate the next value
+  
+  // Check if the next value exceeds the maximum
+  if (nextValue > increments[1] || nextValue < increments[0]) {
+  return value;
+}
+  
+  return nextValue;
+}
+
+
+
+//  GENERATION
+seedbutton.addEventListener("click", () => {
+  seed = parseInt(seedinput.value);
+  resetVoxelGrid();
+  updateseed();
+})
+
+function updateseed(){seeddisplay.textContent = seed}
+
+
+
