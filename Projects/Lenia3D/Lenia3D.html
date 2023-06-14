@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>LENIA3D</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -69,11 +68,21 @@
 
   <div class="container">
     <h8>Generation</h8>
+    <div class="kernel-container">
     <div class="parameter-row">
       <label for="seed">Seed:</label>
-      <input type="text" name="seedinput" class="seed-input" pattern="\d{8}" oninput="validateSeedInput(this)">
-      <button class="button reset-button" id="seed-button">Generate</button>
+      <input type="text" id="seedinput" class="seed-input" pattern="\d{8}" oninput="validateSeedInput(this)">
+      <img id="seedwarning" class="warning" alt="Error: Improper Seed Input">
 
+
+    </div>
+    <div class="parameter-row">
+      Cluster Size:
+      <input type="range" id="cluster-slider" min="0" max="100" step="1" style="height: 70%;">
+      <div id="cluster">0</div>
+    </div>
+    <button class="button reset-button" id="seed-button">Generate</button>
+  </div>
   </div>
 
   <div class="container">
@@ -89,3 +98,4 @@
   <script src = "lenia.js"></script>
 </body>
 </html>
+

@@ -14,10 +14,10 @@ body{
     /* CSS for the containers */
     .container {
       position: fixed;
-      top: 3%;
+      top: 4%;
       right: 10px;
-      border-radius: 8px;
-      padding: 20px;
+      border-radius: 3%;
+      padding: 2%;
       overflow: auto;
       display: none;
       align-items: center;
@@ -101,8 +101,6 @@ body{
         align-items: left;
         text-align: left;
         padding: 10px;
-        color: #7A7C80;
-        font-size: 14px;
       }
       
       .parameter-row {
@@ -110,6 +108,8 @@ body{
         display: flex;
         align-items : center;
         margin: 1% 0 ;
+        color: #9c9fa5;
+        font-size: 14px;
       }
       .parameter-sliders {
         margin: 2% 0 
@@ -144,7 +144,14 @@ body{
   background-repeat: no-repeat;
   cursor: pointer;
 }
-  
+
+.warning {
+  width: 20px; /* Adjust the width as needed */
+  height: 20px; /* Adjust the height as needed */
+  background-image: url('warning.png'); /* Replace with the actual path to your warning image */
+  background-size: cover;
+  background-repeat: no-repeat;
+}
     .pause-button {
       background-image: url('pausebutton.png');
     }
@@ -185,7 +192,6 @@ body{
         position: fixed;
         display: flex;
         color : #cdd0d6;
-        font-size: 14px;
-        top: 3%;
-        left: 3% 
+        top: 1%;
+        left: 2% 
       }

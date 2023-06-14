@@ -301,7 +301,7 @@ const radiuscounter = document.getElementById("radius");
 const timecounter = document.getElementById("time");
 const mucounter = document.getElementById("mu");
 const sigmacounter = document.getElementById("sigma");
-const seedinput = document.getElementById("seedinput");
+  const seedinput = document.getElementById("seedinput");
 const seedbutton = document.getElementById("seed-button");
 const seeddisplay = document.getElementById("seed");
 // Get the buttons for adding and subtracting
@@ -373,11 +373,11 @@ reset.addEventListener("click", () => {
     if (padding > 0) {
 
       new_grid = tf.tidy(() => {return tf.variable(tf.pad(grid,[[padding,padding],[padding,padding],[padding,padding]]))})
-      new_dir_grid = tf.tidy(() => {return tf.variable(tf.zeros(new_grid.shape).cast('int32'))})}
+      new_dir_grid = tf.tidy(() => {return tf.variable(tf.zeros(new_grid.shape).cast('float32'))})}
     else { 
       padding = -padding
       new_grid = tf.tidy(()=>{return tf.variable(grid.slice([padding,padding,padding],[grid_size-padding-1,grid_size-padding-1,grid_size-padding-1]))})
-      new_dir_grid = tf.tidy(() => {return tf.variable(tf.zeros(new_grid.shape).cast('int32'))})}
+      new_dir_grid = tf.tidy(() => {return tf.variable(tf.zeros(new_grid.shape).cast('float32'))})}
     tf.dispose([grid,dirGrid])
     grid = tf.variable(new_grid.clone()); dirGrid = tf.variable(new_dir_grid.clone())
     tf.dispose([new_grid,new_dir_grid])
@@ -438,6 +438,7 @@ function inc(value, increments,dir) {
 
 
 //  GENERATION
+
 seedbutton.addEventListener("click", () => {
   seed = parseInt(seedinput.value);
   resetVoxelGrid();
