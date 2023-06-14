@@ -1,6 +1,5 @@
 tf.setBackend('webgl')
 function dir_kernel(grid) {
-
  // Define the weights of the directional kernel
  return tf.tidy(() => {let boolgrid = tf.notEqual(grid,0).cast('int32')
  const kern_weights = tf.tensor([

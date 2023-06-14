@@ -1,0 +1,110 @@
+@import url('https://fonts.googleapis.com/css?family=Roboto');
+
+body{
+    margin: 0;
+    padding: 0;
+    font-family: 'Roboto', sans-serif;
+    background-color: #101214;
+    color: #7A7C80;
+
+}
+
+    
+    
+    /* CSS for the containers */
+    .container {
+      width: 16%;
+      position: fixed;
+      top: 3%;
+      right: 10px;
+      border-radius: 8px;
+      padding: 20px;
+      overflow: auto;
+      display: none;
+      align-items: center;
+      text-align: center;
+      backdrop-filter: blur(10px);
+      background-color: rgba(255, 255, 255, 0.096);
+
+    }
+
+
+  
+
+      .play-controls{
+        display: flex;
+        justify-content: center;
+      }
+      .play-controls button {
+        margin: 0 10%;
+        width: 8vw; /* Use viewport width unit */
+        height: 8vw; /* Use viewport width unit */
+        max-width: 50px; /* Set a maximum width */
+        max-height: 50px; /* Set a maximum height */
+      }
+
+      .parameter-control {
+        display: inline-flex;
+        align-items: center;
+        text-align: center;
+        border-color: #7A7C80;
+        border-radius: 10px;
+        border-width: 1px;  
+        border-style: solid;
+        margin: 5px 5px;
+      }
+      .parameter-control button {
+        margin: 10px 10px;
+      }
+    
+
+  .pause-button,
+  .play-button,
+  .reset-button {
+  background: none;
+  border: none;
+  width: 3vw; /* Use viewport width unit */
+  height: 3vw; /* Use viewport width unit */
+  max-width: 18px; /* Set a maximum width */
+  max-height: 18px; /* Set a maximum height */
+  background-size: contain;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+  
+    .pause-button {
+      background-image: url('pausebutton.png');
+    }
+    
+    .play-button {
+      background-image: url('startbutton.png');
+    }
+    
+    .reset-button {
+      background-image: url('restartbutton.png');
+    }
+
+      /* CSS for the menu */
+      .menu {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+      }
+  
+      .menu ul {
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+      }
+  
+      .menu li {
+        display: inline-block;
+        margin-left: 10px;
+      }
+  
+      .menu li a {
+        color: #ffffff;
+        text-decoration: none;
+      }
+  
+      /* CSS for the containers */
