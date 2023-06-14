@@ -13,7 +13,6 @@ body{
     
     /* CSS for the containers */
     .container {
-      width: 16%;
       position: fixed;
       top: 3%;
       right: 10px;
@@ -22,42 +21,116 @@ body{
       overflow: auto;
       display: none;
       align-items: center;
-      text-align: center;
+      text-align: left;
       backdrop-filter: blur(10px);
       background-color: rgba(255, 255, 255, 0.096);
+      color: #cdd0d6;
 
+    }
+    .gridtime-container{
+      display: flex;
+      flex-direction: column;
+      color: #7A7C80;
+      font-size: 14px;
+      margin: 10px;
+      margin-bottom: 0px;
+    }
+    .gridsize-container{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    width : 95%;
+    border-top: 1% solid #7A7C80;
+    border-bottom: 1% solid #7A7C80;
+      
     }
 
 
-  
 
-      .play-controls{
-        display: flex;
-        justify-content: center;
-      }
+
+    .play-controls {
+      position: fixed;
+      left: 50%;
+      bottom: 3%;
+      transform: translateX(-50%);
+      display: flex;
+      justify-content: center;
+      height: 10%;
+      width: 20%;
+    }
       .play-controls button {
-        margin: 0 10%;
+        margin: 5% 10%;
         width: 8vw; /* Use viewport width unit */
         height: 8vw; /* Use viewport width unit */
         max-width: 50px; /* Set a maximum width */
         max-height: 50px; /* Set a maximum height */
       }
 
-      .parameter-control {
+      .parameter-buttons {
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         text-align: center;
         border-color: #7A7C80;
         border-radius: 10px;
         border-width: 1px;  
         border-style: solid;
-        margin: 5px 5px;
+        margin: 2px 5px;
+        font-size: 10px
       }
-      .parameter-control button {
-        margin: 10px 10px;
+      
+      
+      .parameter-buttons button {
+        margin: 4px 4px;
+        width: 2vw; /* Use viewport width unit */
+        height: 2vw; /* Use viewport width unit */
+        max-width: 12px; /* Set a maximum width */
+        max-height: 12px; /* Set a maximum height */
+      }
+      
+      .title-container{
+        color: #cdd0d6;
+      }
+        
+
+      .kernel-container {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: left;
+        text-align: left;
+        padding: 10px;
+        color: #7A7C80;
+        font-size: 14px;
+      }
+      
+      .parameter-row {
+        justify-content: space-between;
+        display: flex;
+        align-items : center;
+        margin: 1% 0 ;
+      }
+      .parameter-sliders {
+        margin: 2% 0 
+      }
+
+      .parameter-buttons-container{
+        display: flex;
+        align-items : center;
+        justify-content: center;
       }
     
-
+      .seed-input {
+        background-color: transparent; /* Set the background color as transparent */
+        border-color: #7A7C80;
+        border-radius: 4px;
+        border-width: 1px;  
+        border-style: solid;
+        margin : 2px 5px;
+        color : #cdd0d6;
+      }
+      
   .pause-button,
   .play-button,
   .reset-button {
@@ -108,3 +181,11 @@ body{
       }
   
       /* CSS for the containers */
+      .seed-container{
+        position: fixed;
+        display: flex;
+        color : #cdd0d6;
+        font-size: 14px;
+        top: 3%;
+        left: 3% 
+      }
