@@ -11,7 +11,6 @@
       <li><a href="#">Parameters</a></li>
       <li><a href="#">Generation</a></li>
       <li><a href="#">Life</a></li>
-      <li><a href="#">Visual</a></li>
     </ul>
   </div>
   <div id = "namecont" class="name-container">
@@ -89,57 +88,6 @@
     <button class="button reset-button" id="seed-button">Generate</button>
   </div>
   </div>
-  <div class="play-controls">
-    <button class="button play-button" id="startstop"></button>
-    <button class="button reset-button" id ="reset"></button>
-</div>
-  <div class="container">
-    <h8>Parameters</h8>
-    <div class = "gridtime-container">
-      <div class="parameter-row">
-        <label for="grid size">Grid Size:</label>
-        <input type="range" id="gridsize-slider" min="10" max="100" step="2" style="width: 65%; margin-right: 3% ;">
-        <div id="gridsize" style="margin-right: 10px;">0</div>
-      </div>
-      <div class = "parameter-row">
-         <label for="Time resolution">Time resolution:</label>
-        <div class="parameter-buttons">
-          <button class="button reset-button" id="time-sub-button"></button>
-          <div id="time"> 0</div>
-          <button class="button reset-button" id="time-add-button"></button>
-        </div>
-      </div>
-      </div>
-
-      <div class="kernel-container">
-        <div class="parameter-row" style="border-bottom: 1px solid #ccc;">
-         <div class="title-container">
-        <label for="kernel">Kernel</label>
-      </div> 
-        <div class="parameter-buttons-container">
-          <label for="radius">R:</label>
-        <div class="parameter-buttons">
-          <button class="button reset-button" id="radius-sub-button">-</button>
-          <div id="radius">0</div>
-          <button class="button reset-button" id="radius-add-button">+</button>
-        </div>
-      </div>
-      </div>
-        <div class="parameter-row">
-          <div class="parameter-buttons-container">
-          M: <input type="range" id="mu-slider" min="0" max="1" step="0.001" style="height: 70%;">
-          <div id="mu">0</div>
-        </div>
-        </div>
-        <div class="parameter-row">
-        <div class="parameter-buttons-container">
-          S: <input type="range" id="sigma-slider" min="0" max="1" step="0.001" style="height: 70%;">
-          <div id="sigma">0</div>
-        </div>
-      </div>
-      </div>
-  </div>  
-
   <div class="container">
     <h8>Life</h8>
     <div id="AnimalWindow" class="animalWindow">
@@ -147,10 +95,6 @@
     </div>
   </div>
   
-
-  <div class="container">
-    <h2>Visual</h2>
-  </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r132/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three/examples/js/controls/OrbitControls.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>

@@ -357,7 +357,6 @@ function animatestate() {
         golupdate();
         updateVoxelGrid()
         animatestate();
-        console.log(tf.memory().numTensors)
       }, Math.floor(1000/worldparams['T']))
 
     // Render your game objects here
@@ -536,7 +535,6 @@ function updates() {
 startstop.addEventListener("click", () => {
   updatestate()
 });
-
 function updateworldparams() {
   updateradius();
   updatet();
@@ -680,7 +678,6 @@ function SelectAnimalItem(e) {
 }
 
 function SelectAnimalID(id) {
-  console.log(id)
   if (id < 0 || id >= animalArr.length) return;
   var a = animalArr[id];
   if (Object.keys(a).length < 4) return;
@@ -764,3 +761,4 @@ const animate = function () {
   renderer.render( scene, camera );
 };
   animate();
+  updatestate()
