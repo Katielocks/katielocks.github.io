@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>LENIA3D</title>
     <link rel="stylesheet" href="styles.css">
+    
+<script type="text/javascript" src="animals3D.js"></script>
 </head>
 <body>
   <div class="menu">
@@ -13,51 +14,89 @@
       <li><a href="#">Visual</a></li>
     </ul>
   </div>
+  <div id = "namecont" class="name-container">
+    <div id="name"> Blank </div>
+  </div>
+  <div id = "seedcont" class="seed-container">
+    <div id="seed"> 00000000</div>
+  </div>
+  <div class="play-controls">
+    <button class="button play-button" id="startstop"></button>
+    <button class="button reset-button" id ="reset"></button>
+</div>
+  <div class="container">
+    <h8>Parameters</h8>
+    <div class = "gridtime-container">
+      <div class="parameter-row">
+        <label for="grid size">Grid Size:</label>
+        <input type="range" id="gridsize-slider" min="10" max="100" step="2" style="width: 65%; margin-right: 3% ;">
+        <div id="gridsize" style="margin-right: 10px;">0</div>
+      </div>
+      <div class = "parameter-row">
+         <label for="Time resolution">Time resolution:</label>
+        <div class="parameter-buttons">
+          <button class="button reset-button" id="time-sub-button"></button>
+          <div id="time"> 0</div>
+          <button class="button reset-button" id="time-add-button"></button>
+        </div>
+      </div>
+      </div>
+
+      <div class="kernel-container">
+        <div class="parameter-row" style="border-bottom: 1px solid #ccc;">
+         <div class="title-container">
+        <label for="kernel">Kernel</label>
+      </div> 
+        <div class="parameter-buttons-container">
+          <label for="radius">R:</label>
+        <div class="parameter-buttons">
+          <button class="button reset-button" id="radius-sub-button">-</button>
+          <div id="radius">0</div>
+          <button class="button reset-button" id="radius-add-button">+</button>
+        </div>
+      </div>
+      </div>
+        <div class="parameter-row">
+          <div class="parameter-buttons-container">
+          M: <input type="range" id="mu-slider" min="0" max="1" step="0.001" style="height: 70%;">
+          <div id="mu">0</div>
+        </div>
+        </div>
+        <div class="parameter-row">
+        <div class="parameter-buttons-container">
+          S: <input type="range" id="sigma-slider" min="0" max="1" step="0.001" style="height: 70%;">
+          <div id="sigma">0</div>
+        </div>
+      </div>
+      </div>
+  </div>  
 
   <div class="container">
-    
-    <div class="play-controls">
-        <button class="button play-button" id="startstop"></button>
-        <button class="button reset-button" id ="reset"></button>
+    <h8>Generation</h8>
+    <div class="kernel-container">
+    <div class="parameter-row">
+      <label for="seed">Seed:</label>
+      <input type="text" id="seedinput" class="seed-input" pattern="\d{8}" oninput="validateSeedInput(this)">
+      <img id="seedwarning" class="warning" alt="Error: Improper Seed Input">
+
+
     </div>
-    <label for="grid size">Grid Size:</label>
-    <input type="range" id="gridsize-slider" min="10" max="100" step="2">
-    <div id = "gridsize"> 0</div>
-      <label for="radius">R:    </label>
-      <div class="parameter-control">
-      <button class="button reset-button" id="radius-sub-button"></button>
-      <div id="radius"> 0</div>
-      <button class="button reset-button" id="radius-add-button"></button>
+    <div class="parameter-row">
+      Cluster Size:
+      <input type="range" id="cluster-slider" min="0" max="100" step="1" style="height: 70%;">
+      <div id="cluster">0</div>
     </div>
-      <label for="Time resolution">T:   </label>
-      <div class="parameter-control">
-      <button class="button reset-button" id="time-sub-button"></button>
-      <div id="time"> 0</div>
-      <button class="button reset-button" id="time-add-button"></button>
-    </div>
-    <br>
-      <label for="gamma">G:    </label>
-      <div class="parameter-control">
-      <button class="button reset-button" id="mu-sub-button"></button>
-      <div id="gamma">0</div>
-      <button class="button reset-button" id="mu-add-button"></button>
-    </div>
-      <label for="mu">M:    </label>
-      <div class="parameter-control">
-      <button class="button reset-button" id="sigma-sub-button"></button>
-      <div id="mu">0</div>
-      <button class="button reset-button" id="sigma-add-button"></button>
-    </div>
-    </div>
+    <button class="button reset-button" id="seed-button">Generate</button>
+  </div>
   </div>
 
   <div class="container">
-    <h2>Generation</h2>
+    <h8>Life</h8>
+    <div id="AnimalWindow" class="animalWindow">
+      <ul id="AnimalList" class="animalList"></ul>
+    </div>
   </div>
-
-  <div class="container">
-    <h2>Life</h2>
-  </div>
+  
 
   <div class="container">
     <h2>Visual</h2>
@@ -68,5 +107,7 @@
   <script src = "lenia.js"></script>
 </body>
 </html>
+
+
 
 
