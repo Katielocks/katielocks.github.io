@@ -10,14 +10,12 @@ body{
 }
 
     
-    
-    /* CSS for the containers */
     .container {
       position: fixed;
       top: 4%;
       right: 10px;
       border-radius: 3%;
-      padding: 2%;
+      padding: 1%;
       overflow: auto;
       display: none;
       align-items: center;
@@ -25,8 +23,6 @@ body{
       backdrop-filter: blur(10px);
       background-color: rgba(255, 255, 255, 0.096);
       color: #cdd0d6;
-      height: 20%;
-      width: 18%;
 
     }
     .gridtime-container{
@@ -47,12 +43,12 @@ body{
     border-bottom: 1% solid #7A7C80;
       
     }
-    .animalWindow { color:#cdd0d6; ;; padding:0px;
-       overflow:auto; }
+    .animalWindow { color:#cdd0d6; padding:0px;
+       overflow:auto;}
   UL.animalList, UL.animalList UL { padding-left:10px; }
   UL.animalList LI { list-style-type:none; position:relative; }
   UL.animalList LI.group > DIV { font-weight:bold; background-color:#394046; border-bottom:solid 2px #cdd0d6; padding-top:0.2em; }
-  UL.animalList LI.closed > DIV { background-color:#4c5058 border-bottom:solid 2px #7A7C80; }
+  UL.animalList LI.closed > DIV { background-color:#4c5058; border-bottom:solid 2px #7A7C80; }
   UL.animalList LI.closed > UL { display:none; }
   UL.animalList LI.group > DIV:before { content:'[-] '; }
   UL.animalList LI.closed > DIV:before { content:'[+] '; }
@@ -211,15 +207,17 @@ body{
         position: fixed;
         display : none;
         color : #cdd0d6;
-        top: 1%;
-        left: 2% 
+        top: 3%;
+        left: 2%;
       }
 
       .name-container{
         position: fixed;
         display : none;
+        flex-direction: column;
         color : #cdd0d6;
-        top: 1%;
-        left: 2%;
         font-size: 24px;
+        font : italic;
+        padding : 2%;
       }
+

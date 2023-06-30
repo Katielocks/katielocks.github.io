@@ -2,7 +2,7 @@
 <html>
 <head>
     <link rel="stylesheet" href="styles.css">
-    
+    <title>Lenia3D</title>
 <script type="text/javascript" src="animals3D.js"></script>
 </head>
 <body>
@@ -13,12 +13,19 @@
       <li><a href="#">Life</a></li>
     </ul>
   </div>
-  <div id = "namecont" class="name-container">
-    <div id="name"> Blank </div>
+<div id="namecont" class="name-container">
+  <div id="type" style="font-size: 12px;">Blank</div>
+  <div id="name">Blank</div>
+</div>
+<div id="seedcont" class="seed-container">
+  <div id="seed">00000000</div>
   </div>
-  <div id = "seedcont" class="seed-container">
-    <div id="seed"> 00000000</div>
-  </div>
+</div>
+<div class = "parameter-row" style = " margin: 0px; width: 5%; padding : 10px">
+  <div id="gen">0</div>
+  <div id="time">0</div>
+</div>
+
   <div class="play-controls">
     <button class="button play-button" id="startstop"></button>
     <button class="button reset-button" id ="reset"></button>
@@ -35,7 +42,7 @@
          <label for="Time resolution">Time resolution:</label>
         <div class="parameter-buttons">
           <button class="button reset-button" id="time-sub-button"></button>
-          <div id="time"> 0</div>
+          <div id="timeres"> 0</div>
           <button class="button reset-button" id="time-add-button"></button>
         </div>
       </div>
@@ -75,20 +82,18 @@
     <div class="kernel-container">
     <div class="parameter-row">
       <label for="seed">Seed:</label>
-      <input type="text" id="seedinput" class="seed-input" pattern="\d{8}" oninput="validateSeedInput(this)">
-      <img id="seedwarning" class="warning" alt="Error: Improper Seed Input">
-
-
+      <input type="text" id="seedinput" class="seed-input" pattern="\d{8}" oninput="lenia.UI.validateSeedInput(this)">
+      <button class="button reset-button" id="seed-button"></button>
+      <img id="seedwarning" class="warning">
     </div>
     <div class="parameter-row">
       Cluster Size:
       <input type="range" id="cluster-slider" min="0" max="100" step="1" style="height: 70%;">
       <div id="cluster">0</div>
     </div>
-    <button class="button reset-button" id="seed-button">Generate</button>
   </div>
   </div>
-  <div class="container">
+  <div class="container" style="height:20%">
     <h8>Life</h8>
     <div id="AnimalWindow" class="animalWindow">
       <ul id="AnimalList" class="animalList"></ul>
@@ -98,7 +103,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r132/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three/examples/js/controls/OrbitControls.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-  <script src = "lenia.js"></script>
+  <script src = "leniaRF.js"></script>
 </body>
 </html>
 
