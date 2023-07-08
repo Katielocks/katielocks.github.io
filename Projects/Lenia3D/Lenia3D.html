@@ -32,12 +32,14 @@
 </div>
   <div class="container">
     <h8>Parameters</h8>
-    <div class = "gridtime-container">
-      <div class="parameter-row">
-        <label for="grid size">Grid Size:</label>
-        <input type="range" id="gridsize-slider" min="10" max="100" step="2" style="width: 65%; margin-right: 3% ;">
-        <div id="gridsize" style="margin-right: 10px;">0</div>
-      </div>
+    <div class = "parameter-row" style="border-bottom: 1px solid #ccc;">
+      <label for="Dimension">Dimension:</label>
+      <label for="dim" id = "dim">Dimension:</label>
+   </div>
+      <div class = "parameter-container" id ="gridparams">
+        </div>
+
+      
       <div class = "parameter-row">
          <label for="Time resolution">Time resolution:</label>
         <div class="parameter-buttons">
@@ -46,13 +48,10 @@
           <button class="button reset-button" id="time-add-button"></button>
         </div>
       </div>
-      </div>
 
-      <div class="kernel-container">
+
         <div class="parameter-row" style="border-bottom: 1px solid #ccc;">
-         <div class="title-container">
         <label for="kernel">Kernel</label>
-      </div> 
         <div class="parameter-buttons-container">
           <label for="radius">R:</label>
         <div class="parameter-buttons">
@@ -62,17 +61,16 @@
         </div>
       </div>
       </div>
+
+
+      <div class="parameter-container">
         <div class="parameter-row">
-          <div class="parameter-buttons-container">
-          M: <input type="range" id="mu-slider" min="0" max="1" step="0.001" style="height: 70%;">
-          <div id="mu">0</div>
-        </div>
+          M: <input type="range" class="seed-input" id="mu-slider" min="0" max="1" step="0.001" style="height: 70%; width : 70%;">
+          <input  id="mu" class="seed-input" style = "width : 20%">
         </div>
         <div class="parameter-row">
-        <div class="parameter-buttons-container">
-          S: <input type="range" id="sigma-slider" min="0" max="1" step="0.001" style="height: 70%;">
-          <div id="sigma">0</div>
-        </div>
+          S: <input type="range" class="seed-input" id="sigma-slider" min="0" max="1" step="0.001" style="height: 70%; width : 70%;">
+          <input id="sigma" class="seed-input" style = "width : 20%">
       </div>
       </div>
   </div>  
@@ -103,7 +101,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r132/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three/examples/js/controls/OrbitControls.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-  <script src = "leniaRF.js"></script>
+  <script src = "lenia.js"></script>
 </body>
 </html>
 

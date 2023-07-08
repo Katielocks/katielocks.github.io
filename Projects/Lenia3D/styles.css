@@ -25,13 +25,14 @@ body{
       color: #cdd0d6;
 
     }
-    .gridtime-container{
+    .parameter-container{
       display: flex;
       flex-direction: column;
       color: #7A7C80;
+      align-items: left;
       font-size: 14px;
-      margin: 10px;
-      margin-bottom: 0px;
+      margin: 0 2%;
+      padding : 10px
     }
     .gridsize-container{
     display: flex;
@@ -103,14 +104,6 @@ body{
       }
         
 
-      .kernel-container {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: left;
-        text-align: left;
-        padding: 10px;
-      }
       
       .parameter-row {
         justify-content: space-between;
