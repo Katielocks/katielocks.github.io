@@ -23,6 +23,8 @@ body{
       backdrop-filter: blur(10px);
       background-color: rgba(255, 255, 255, 0.096);
       color: #cdd0d6;
+      width : 20%;
+      height : 45%;
 
     }
     .parameter-container{
@@ -42,23 +44,29 @@ body{
     width : 95%;
     border-top: 1% solid #7A7C80;
     border-bottom: 1% solid #7A7C80;
-      
     }
     .animalWindow { color:#cdd0d6; padding:0px;
        overflow:auto;}
-  UL.animalList, UL.animalList UL { padding-left:10px; }
+  UL.animalList, UL.animalList UL { padding-left:0%;}
   UL.animalList LI { list-style-type:none; position:relative; }
-  UL.animalList LI.group > DIV { font-weight:bold; background-color:#394046; border-bottom:solid 2px #cdd0d6; padding-top:0.2em; }
-  UL.animalList LI.closed > DIV { background-color:#4c5058; border-bottom:solid 2px #7A7C80; }
+  UL.animalList LI.group > DIV {padding-top:0.2em; }
   UL.animalList LI.closed > UL { display:none; }
-  UL.animalList LI.group > DIV:before { content:'[-] '; }
-  UL.animalList LI.closed > DIV:before { content:'[+] '; }
-  UL.animalList LI.group > DIV:hover { background-color:#4c5058 !important; }
+  UL.animalList LI.group > DIV:hover { background-color:#5f6063 !important; }
   UL.animalList LI.action:hover,
-  UL.animalList LI.closed > DIV:hover { background-color:#4c5058  !important; }
+  UL.animalList LI.closed > DIV:hover { background-color:#5f6063  !important; }
   UL.animalList LI.action, UL.animalList LI.group > DIV { cursor:pointer; }
-  UL.animalList LI.selected { background-color:#848b99 ; color:#fff; }
-
+  UL.animalList LI.selected { background-color:#5f6063 ; color:#fff; }
+  .arrow {
+    background-image: url('downarrow.png');
+    background-size: cover;
+    background-repeat: no-repeat;
+    width : 20px;
+    height : 20px;
+  }
+  .sideways {
+    transform: rotate(270deg);
+    /* Add any additional styles for the sideways arrow */
+  }
     .play-controls {
       position: fixed;
       left: 50%;
@@ -131,6 +139,7 @@ body{
         border-style: solid;
         margin : 2px 5px;
         color : #cdd0d6;
+        width : 8%;
       }
       
   .pause-button,
@@ -214,3 +223,25 @@ body{
         padding : 2%;
       }
 
+      .row {
+        display: flex;
+        align-items: center;
+      }
+  
+      .label {
+        margin-right: 10px;
+        min-width: 100px;
+        text-align: right;
+      }
+  
+      .input-field {
+        width: 5%;
+        text-align: center;
+      }
+
+      .generate-button-container{
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        
+      }

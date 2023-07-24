@@ -21,6 +21,9 @@ class Lenia {
         this.params = {'R':15, 'T':10, 'b':[1], 'm':0.1, 's':0.01, 'kn':1, 'gn':1};
         this.DIM = 3;
         this.size = Array(this.DIM).fill(64);
+        this.cluster_size = this.size.map(x => x);
+        this.cluster_density = 1
+        this.cluster_range = [0,1]
         this.seed = null
         this.id = null
         this.isRunning = false;
@@ -89,7 +92,6 @@ class tensor {
     constructor(lenia) {
       this.lenia = lenia;
       this.init(true);
-      this.cluster_size = this.lenia.size.map(x => x);
       this.load = new Load(this.lenia);
 
       this.kernel_core = {
@@ -233,12 +235,14 @@ class tensor {
         return tf.pad(grid,padding)
     }
     randomGrid(){
-        if (this.lenia.seed == null){this.generateseed()}
-        const new_grid = tf.tidy(() => {return tf.variable(this.resize(tf.randomUniform(this.cluster_size, 0, 1, 'float32', seed),this.lenia.size))})
+        const new_grid = tf.tidy(() => {
+            const randomGrid = tf.randomUniform(this.lenia.cluster_size, this.lenia.cluster_range[0], this.lenia.cluster_range[1], 'float32', seed)
+            const randomBoolGrid = tf.randomUniform(this.lenia.cluster_size, 0, 1, 'float32', seed).less(this.lenia.cluster_density)
+            const new_grid = tf.mul(randomGrid,randomBoolGrid)
+            return tf.cast(this.resize(new_grid,this.lenia.size),'float32')})
         this.grid.assign(new_grid)
         this.lenia.mesh.update(true)
         new_grid.dispose()
-        this.lenia.id = null
     }
     generateseed() {
         this.lenia.seed = Math.floor(Math.random() * Math.pow(10, 8));
@@ -253,19 +257,21 @@ class tensor {
         return  egrid.clipByValue(0,1).cast('int32')})
     }
     
-    update() {  
-        const dummy  = tf.tidy(() => {
-            const fftngrid = this.fftn(this.grid.cast('complex64'))
-            const potential_FFT = tf.mul(fftngrid, this.kernel)
-            const dt = 1/this.lenia.params['T']
-            const U = tf.real(this.ifftn(potential_FFT))
-            const gfunc = this.growth_func[this.lenia.params['gn'] - 1]
-            const field = gfunc(U, this.lenia.params['m'], this.lenia.params['s'])
-            const grid_new = tf.add(this.grid,tf.mul(dt,field))
-            return grid_new.clipByValue(0,1)
-        })
+    async update() {  
+        if (this.lenia.isRunning === false) {return}
+        const complexgrid = this.grid.cast('complex64')
+        const fftngrid = this.fftn(complexgrid)
+        const potential_FFT = tf.mul(fftngrid, this.kernel)
+        const dt = 1/this.lenia.params['T']
+        const complexU = this.ifftn(potential_FFT)
+        const U = tf.real(complexU)
+        const gfunc = this.growth_func[this.lenia.params['gn'] - 1]
+        const field = gfunc(U, this.lenia.params['m'], this.lenia.params['s'])
+        const scalarfield =tf.mul(dt,field)
+        const grid_new = tf.add(this.grid,scalarfield)
+        const dummy =  grid_new.clipByValue(0,1)
         this.grid.assign(dummy)
-        dummy.dispose()
+        tf.dispose([complexgrid,fftngrid,potential_FFT,complexU,U,field,scalarfield,grid_new,dummy])
         }
     zoom(Tensor,zoom){
         return tf.tidy(()=>{
@@ -308,6 +314,8 @@ class mesh {
         const error = this.size.map(x=>Math.abs(x%2))
         this.offset = this.size.map(x=>(x-1)/2)
         this.init()
+        this.colourbarmax = [253/255,232/255,64/255]
+        this.colourbarmin = [68/255,13/255,84/255]
 
     }
     init() {
@@ -344,7 +352,8 @@ class mesh {
         const shape = this.lenia.size.slice(-3)
         let meshindex = local[2]+shape[0]*local[1]+local[0]*shape[0]*shape[1]
         const value = values[index]
-        this.mesh.setColorAt(meshindex, new THREE.Color(0, value, 0));
+        const colour = this.colorbar(value)
+        this.mesh.setColorAt(meshindex, colour);
 
     }}
     async update(init=false) {
@@ -383,6 +392,12 @@ class mesh {
           currgrid
         ]);
       }
+      colorbar(value){
+        const color = new THREE.Color()
+        const colours = this.colourbarmax.map((x,i)=>(x-this.colourbarmin[i])*value+this.colourbarmin[i])
+        color.setRGB(colours[0],colours[1],colours[2])
+        return color
+      }
 
     
 
@@ -391,7 +406,6 @@ class mesh {
 class UI{
     constructor(lenia){
     this.gridparamscontainer = document.getElementById("gridparams");
-
     this.lenia = lenia
     this.gencounter = document.getElementById("gen");
     this.timecounter = document.getElementById("time");
@@ -414,7 +428,6 @@ class UI{
     this.mucounter = document.getElementById("mu");
     this.sigmacounter = document.getElementById("sigma");
     this.seedinput = document.getElementById("seedinput");
-    this.seedbutton = document.getElementById("seed-button");
     this.radiusAddButton = document.getElementById("radius-add-button");
     this.radiusSubButton = document.getElementById("radius-sub-button");
     this.timeAddButton = document.getElementById("time-add-button");
@@ -423,6 +436,58 @@ class UI{
     this.sigmaslider = document.getElementById("sigma-slider");
     this.seedWarning = document.getElementById("seedwarning");
     this.dimcounter = document.getElementById("dim");
+    this.bcontainer = document.getElementById("bcontainer");
+    this.bdimcounter = document.getElementById("bdim");
+    this.bdimaddbutton = document.getElementById("bdim-add-button");
+    this.bdimsubbutton = document.getElementById("bdim-sub-button");
+    this.cdimcounter = document.getElementById("cdim");
+    this.clustercontainer  = document.getElementById("clusterparams");
+    this.clusterinputmin = document.getElementById("cluster-min-value");
+    this.clusterinputmax = document.getElementById("cluster-max-value");
+    this.densityslider = document.getElementById("density-slider");
+    this.densitycounter = document.getElementById("density");
+    this.generatebutton = document.getElementById("generate-button");
+
+    this.generatebutton.addEventListener("click", () => {
+        if (this.seedinput.value.length === 8) {
+        this.lenia.seed  = parseInt(this.seedinput.value);}
+        else if (this.seedinput.value.length !== 8 && this.seedinput.value.length !== 0) {return}
+        if (this.seedinput.value.length === 0){this.lenia.tensor.generateseed()}
+        this.lenia.tensor.randomGrid();
+        this.lenia.mesh.update(true);
+        this.lenia.id = null;
+        this.updateseed()
+    })
+
+    this.densityslider.addEventListener("change", () => {
+        const Value = parseFloat(this.densityslider.value)
+        this.lenia.cluster_density = Value
+        this.updatedensity();
+    });
+    this.densityslider.addEventListener("input", () => {
+        const sliderValue = parseFloat(this.densityslider.value)  ;
+        this.densitycounter.value = sliderValue;
+        });
+    this.densitycounter.addEventListener("blur", () => {
+        Value = parseFloat(this.densitycounter.value);
+        this.lenia.cluster_density = Value;
+        this.updatedensity();
+        });
+
+
+
+
+    this.clusterinputmin.addEventListener("change", () => {
+        const Value = parseFloat(this.clusterinputmin.value)
+        this.clusterValueMin = Value
+        $("#cluster-slider-range").slider("values", 0, Value);
+    });
+    this.clusterinputmax.addEventListener("change", () => {
+        const Value = parseFloat(this.clusterinputmax.value)
+        this.clusterValueMax = Value
+        $("#cluster-slider-range").slider("values", 1, Value);
+    });
+
     this.radiusAddButton.addEventListener("click", () => {
         this.lenia.params['R'] = this.inc(this.lenia.params['R'], this.rrange,1)
         this.updateradius();
@@ -443,6 +508,13 @@ class UI{
         this.updatet();
     });
     
+    this.bdimaddbutton.addEventListener("click", () => {
+        this.lenia.params['b'].push(0)
+        this.updateb();
+    });
+    this.bdimsubbutton.addEventListener("click", () => {
+        this.lenia.params['b'].pop()
+        this.updateb();})
 
 
     this.muslider.addEventListener("change", () => {
@@ -475,36 +547,50 @@ class UI{
 
 
 
-      this.seedbutton.addEventListener("click", () => {
-        const inputValue = this.seedinput.value;
-        if (!inputValue || inputValue.length !== 8) { return;}
+     /// this.seedbutton.addEventListener("click", () => {
+      //  const inputValue = this.seedinput.value;
+      //  if (!inputValue || inputValue.length !== 8) { return;}
         
-        const value = parseInt(inputValue);
-        if (!isNaN(value)) {
-            this.lenia.seed = value;
-        }
-        
-        this.updateseed();
-        this.lenia.tensor.randomGrid();
-        this.lenia.mesh.update();
-    });
+      //  const value = parseInt(inputValue);
+      //  if (!isNaN(value)) {
+      //      this.lenia.seed = value;
+    //    }
+      //  
+      //  this.updateseed();
+      //  this.lenia.tensor.randomGrid();
+       // this.lenia.mesh.update();
+   // });
 
     this.reset.addEventListener("click", this.lenia.reset.bind(this.lenia))
     this.updatedim()
     this.PopulateAnimalList()
     this.updateparams()
-    this.Populategridparameters()
+    this.populateParameters(this.gridparamscontainer,["x","y","z"],this.lenia.size,this.lenia.tensor.updateGridSize.bind(this.lenia.tensor),[0,100,1])
+    this.populateParameters(this.clustercontainer,["x","y","z"],this.lenia.cluster_size,null,[0,100,1])
+    this.generateClusterRange()
+    this.updatedensity()
+}   
+
+    updatedensity(){
+        this.densityslider.value = this.lenia.cluster_density
+        this.densitycounter.value = this.lenia.cluster_density
     }
-    inc(value, increments,dir) {
-    const range = increments[1] - increments[0]; // Calculate the range
-    const step = dir*range / increments[2]; // Calculate the step size
-        const nextValue = value + step; // Calculate the next value
-    // Check if the next value exceeds the maximum
-    if (nextValue > increments[1] || nextValue < increments[0]) {
-    return value;
-    }
-    
-    return nextValue;
+    generateClusterRange() {
+        $("#cluster-min-value").val(this.lenia.cluster_range[0]);
+        $("#cluster-max-value").val(this.lenia.cluster_range[1]);
+        $("#cluster-slider-range").slider({
+        range: true,
+        min: 0,
+        max: 1,
+        step: 0.001,
+        values: this.lenia.cluster_range,
+        slide: (event, ui) => {
+            this.lenia.cluster_range = ui.values
+            $("#cluster-min-value").val(this.lenia.cluster_range[0]);
+            $("#cluster-max-value").val(this.lenia.cluster_range[1]);
+        }
+        });
+
     }
 
       menuvar() {
@@ -527,6 +613,11 @@ class UI{
     updateradius() {this.radiuscounter.textContent = this.lenia.params['R'].toFixed(0);}
     updatet() {this.timerescounter.textContent = this.lenia.params['T'].toFixed(0);}
     updatedim(){this.dimcounter.textContent = this.lenia.DIM;} 
+    updateb() {
+        this.lenia.tensor.generateKernel()
+        this.populateBParams()
+        this.bdimcounter.textContent = this.lenia.params['b'].length;
+      }
     updatem() { const value = this.lenia.params['m'];
                 this.mucounter.value = value;
                 this.muslider.value  = value;}
@@ -538,21 +629,19 @@ class UI{
         this.updatet();
         this.updatem();
         this.updates();
+        this.updateb();
     }
     updatetime(){this.timecounter.textContent = this.lenia.time.toFixed(2);}
     updategen(){this.gencounter.textContent = this.lenia.gen;}
 
     updateseed() {
-        if (this.seedinput.value.length  === 8) {;
         if (window.getComputedStyle(this.seedcontainer).display === "none") {
             this.seedcontainer.style.display = "block";
         }
         if (window.getComputedStyle(this.namecontainer).display === "flex") {
             this.namecontainer.style.display = "none";
         }
-        this.lenia.seed  = parseInt(this.seedinput.value);
         this.seeddisplay.textContent = this.lenia.seed;
-      }
     }
     updatename() {
         if (window.getComputedStyle(this.seedcontainer).display === "block") {
@@ -578,7 +667,6 @@ class UI{
             if (Object.keys(a).length >= 3) {
                 var codeSt = a['code'].split("(")[0];
                 var engSt = a['name'].split(" ");
-          
                 if (codeSt.startsWith("~")) codeSt = codeSt.substring(1);
                 if (codeSt.startsWith("*")) codeSt = "";
                 var sameCode = codeSt != "" && (codeSt == lastCode);
@@ -592,14 +680,21 @@ class UI{
                     if (st.length >= 3) ruleSt = st[0].trim()+";"+st[1].trim()+";"+st[2].trim();
                     var li = node.appendChild(document.createElement("LI"));
                     li.classList.add("action");
-                    li.title = a[0] + " " + engSt.join(" ") + "\n" + ruleSt;
+                    li.classList.add("parameter-row");
+                    const text = li.appendChild(document.createElement("DIV"));
+                    const code = li.appendChild(document.createElement("DIV"));
+                    text.title = a[0] + " " + engSt.join(" ") + "\n" + ruleSt;
                     if (sameCode) codeSt = " ".repeat(codeSt.length);
                     if (sameEng0) engSt[0] = lastEng0.substring(0, 1) + ".";
-                    li.innerHTML = codeSt + " " + engSt.join(" ")  + " " + this.GetLayerSt(ruleSt);
+                    text.innerHTML = engSt.join(" ");
+                    li.style.color = "#cdd0d6"
+                    li.style.width = "90%"
+                    code.innerHTML = codeSt;
                     li.dataset["animalid"] = i;
                     li.addEventListener("click", this.SelectAnimalItem);
                 } else if (Object.keys(a).length == 3) {
                     var nextLevel = parseInt(codeSt.substring(1));
+                    console.log(nextLevel)
                     var diffLevel = nextLevel - currLevel;
                     var backNum = (diffLevel<=0) ? -diffLevel+1 : 0;
                     var foreNum = (diffLevel>0) ? diffLevel : 1;
@@ -610,9 +705,24 @@ class UI{
                     node = node.appendChild(document.createElement("LI"));
                     node.classList.add("group");
                     var div = node.appendChild(document.createElement("DIV"));
-                    div.title = engSt;
-                    div.innerHTML = engSt;
-                    div.addEventListener("click", function (e) { this.parentElement.classList.toggle("closed"); });
+                    div.classList.add("parameter-row");
+                    const text = div.appendChild(document.createElement("DIV"));
+                    const arrow = div.appendChild(document.createElement("DIV"));
+                    arrow.classList.add("arrow"); 
+                    text.title = engSt;
+                    console.log(engSt)
+                    text.innerHTML = engSt[engSt.length-1];
+                    const scalar = Math.pow(8/9, nextLevel)
+                    const fontsize = scalar*20
+                    const padding = scalar*3
+                    div.style.fontSize = `${fontsize}px`
+                    div.style.color = "#cdd0d6"
+                    text.style.paddingBottom = `${padding}%`
+                    div.style.paddingTop = `${padding}%`
+                    div.addEventListener("click", function (e) {
+                        this.parentElement.classList.toggle("closed");
+                        arrow.classList.toggle("sideways"); // Add this line to toggle the sideways class on the arrow
+                      });
                     for (var k=0; k<foreNum; k++) {
                         node = node.appendChild(document.createElement("UL"));
                     }
@@ -648,50 +758,56 @@ class UI{
           this.seedWarning.style.visibility = 'hidden';
         }
       }
-
-      Populategridparameters(){
-     for (let i = 0; i < this.lenia.size.length; i++) {
-        let pararow = document.createElement("div");
-        let paralabel = document.createElement("label");
-        paralabel.textContent = (i+1).toString()+": ";
-        pararow.classList.add("parameter-row");
-        let paraslider = document.createElement("input");
-        paraslider.type = "range";paraslider.min = 0;paraslider.max = 100;paraslider.step = 1,paraslider.value = this.lenia.size[i];
-        let paratext = document.createElement("input");
-        paratext.type = "text";paratext.value = this.lenia.size[i];
-        paraslider.id = ["gridslider",i].join("-");
-        paratext.id = ["gridtext",i].join("-");
-        paraslider.style.width = "80%";
-        paratext.style.width = "10%";
-        paratext.classList.add("seed-input");
-        pararow.appendChild(paralabel);
-        pararow.appendChild(paraslider);
-        pararow.appendChild(paratext);
-        paraslider.addEventListener("change", (event) => {
+    populateBParams(){
+        this.bcontainer.innerHTML = ''
+        const range  = Array.from({ length: this.lenia.params['b'].length + 1 }, (_, index) => index);
+        this.populateParameters(this.bcontainer,range,this.lenia.params['b'],this.lenia.tensor.generateKernel.bind(this.lenia),[0,1,0.001])
+    }
+    
+    populateClusterParams(){
+        this.clustercontainer.innerHTML = ''
+        const range  = Array.from({ length: this.lenia.cluster_size.length + 1 }, (_, index) => index);
+        this.populateParameters(this.clustercontainer,range,this.lenia.cluster_size.length,this.lenia.tensor.generateKernel.bind(this.lenia),[0,1,0.001])
+    }
+    populateParameters(container,labels,values,eventhandler,ranges){
+     for (let i = 0; i < values.length; i++) { this.Addparameter(container,labels[i],values[i],eventhandler,ranges)}}
+    Addparameter(container,name,value,eventhandler,ranges){
+        let row = document.createElement("div");
+        let label = document.createElement("label");
+        label.textContent = name.toString()+": ";
+        row.classList.add("parameter-row"); 
+        let slider = document.createElement("input");
+        slider.type = "range";slider.min = ranges[0],slider.max = ranges[1];slider.step = ranges[2],slider.value = value;
+        let text = document.createElement("input");
+        text.type = "text";text.value = value;
+        slider.style.width = "80%";
+        text.style.width = "10%";
+        text.classList.add("seed-input");
+        row.appendChild(label);
+        row.appendChild(slider);
+        row.appendChild(text);
+        slider.addEventListener("input", (event) => {
             const sliderValue = parseInt(event.target.value);
-            this.lenia.size[i] = sliderValue;
-            this.lenia.tensor.updateGridSize();
+            text.value = sliderValue;
           });
-      
-          // Event handler for text input
-
-      
-          // Event handler for slider hover
-          paraslider.addEventListener("input", (event) => {
+        if (typeof eventhandler === 'function'){
+        slider.addEventListener("change", (event) => {
             const sliderValue = parseInt(event.target.value);
-            paratext.value = sliderValue;
+            value = sliderValue;
+            eventhandler();
           });
-          paratext.addEventListener("blur", (event) => {
+          text.addEventListener("blur", (event) => {
             const Value = parseInt(event.target.value);
-            paraslider.value = Value;
-            this.lenia.size[i] = Value;
-            this.lenia.tensor.updateGridSize();
+            slider.value = Value;
+            value = Value;
+            eventhandler();
           });
-      
-        this.gridparamscontainer.append(pararow)
+        }
+        container.append(row)
      }
-
-      }
+    Removeparameter(container,i){
+        container.removeChild(container.childNodes[i])
+    }
     
 }
 
@@ -703,11 +819,15 @@ class Load{
 
     }
     SelectAnimalID(id) {
+        let state = false
+        if (this.lenia.isRunning) {
+            state = true
+            this.lenia.updatestate()}
         if (id < 0 || id >= animalArr.length) return;
         var a = animalArr[id];
         if (Object.keys(a).length < 4) return;
         const cellSt = a['cells'];
-        let dummy = tf.tidy(() =>{ 
+        const dummy = tf.tidy(() =>{ 
             const newgrid  = this.rle2arr(cellSt);
             return this.lenia.tensor.resize(newgrid,this.lenia.size);
         });
@@ -719,10 +839,11 @@ class Load{
         this.lenia.params['b'] = this.st2fracs(this.lenia.params['b'])
         dummy.dispose();
         this.lenia.mesh.update(true);
-        this.lenia.tensor.generateKernel()
         this.lenia.UI.updateparams()
         this.lenia.UI.updatename()
         this.lenia.id = id
+        console.log(tf.memory().numTensors)
+        if (state) {this.lenia.updatestate()}
     }
     SelectType(id) {
         let names = []
