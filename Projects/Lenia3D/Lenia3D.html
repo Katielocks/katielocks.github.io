@@ -14,6 +14,7 @@
       <li><a href="#">Parameters</a></li>
       <li><a href="#">Generation</a></li>
       <li><a href="#">Life</a></li>
+      <li><a href="#">Visual</a></li>
     </ul>
   </div>
 <div id="namecont" class="name-container">
@@ -68,11 +69,11 @@
 
       <div id= "kernelcontainer" class="parameter-container">
         <div class="parameter-row">
-          &mu;: <input type="range" class="seed-input" id="mu-slider" min="0" max="1" step="0.001" style="height: 70%; width : 70%;">
+          &mu;: <input type="range" id="mu-slider" min="0" max="1" step="0.001">
           <input  id="mu" class="seed-input" style = "width : 20%">
         </div>
         <div class="parameter-row">
-          &sigma;: <input type="range" class="seed-input" id="sigma-slider" min="0" max="1" step="0.001" style="height: 70%; width : 70%;">
+          &sigma;: <input type="range" id="sigma-slider" min="0" max="1" step="0.001">
           <input id="sigma" class="seed-input" style = "width : 20%">
       </div>
       <div class = "parameter-row" style="border-bottom: 1px solid #ccc;">
@@ -113,12 +114,14 @@
   </div>
   <div class="parameter-row">
     <label for="ClusterSize">Density:</label>
-    <input type="range" class="seed-input" id="density-slider" min="0" max="1" step="0.001" style="height: 70%; width : 70%;">
-    <input id="density" class="seed-input" style = "width : 20%">
+    <input type="range" id="density-slider" min="0" max="1" step="0.001" style="height: 70%; width : 70%;">
+    <input id="density" style = "width : 20%">
 </div>
 <div class = "generate-button-container">
-<button class = "reset-button" id="generate-button"></button>
+  <button class="reset-button" id="generate-button"></button>
 </div>
+</div>
+
 </div>
 
 
@@ -129,6 +132,21 @@
       <ul id="AnimalList" class="animalList"></ul>
     </div>
   </div>
+
+  <div class="container">
+    <h8>Visual</h8>
+    <div class="parameter-row" style="border-bottom: 1px solid #ccc;">
+        <label for="Color">Color Map:</label>
+    </div>
+    <div class="parameter-row">
+      <label for="Color">Minimum:</label>
+      <input type="color" class="seed-input" id = "colorbar-min" value="#000000" />
+      <label for="Color">Maximum:</label>
+      <input type="color" class="seed-input" id = "colorbar-max" value="#000000" />
+    </div>  
+  </div>
+
+
   
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r132/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three/examples/js/controls/OrbitControls.js"></script>

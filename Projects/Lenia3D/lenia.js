@@ -11,6 +11,36 @@ const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; 
 controls.dampingFactor = 0.05; // Set the damping factor for the damping effect
 scene.background = new THREE.Color(0x101214);
+
+
+
+const sliders = document.querySelectorAll('.slider');
+
+  function updateSliderTrack(event) {
+    const slider = event.target;
+    const value = (slider.value - slider.min) / (slider.max - slider.min);
+
+    // Calculate the width of the track to the left of the thumb
+    const trackWidth = value * 100;
+
+    // Set the background color for the left part of the track
+    const colorLeft = `linear-gradient(90deg, #00ff00 ${trackWidth}%, #555353 ${trackWidth}% 100%)`;
+
+    // Update the slider's pseudo-element style with the new background color
+    slider.style.setProperty('--track-color-left', colorLeft);
+  }
+
+  sliders.forEach(slider => {
+    // Initially set the background color based on the slider's initial value
+    updateSliderTrack({ target: slider });
+
+    // Add an event listener to each slider to update the background color when the value changes
+    slider.addEventListener('input', updateSliderTrack);
+  });
+
+
+
+
 const animate = function () {
     requestAnimationFrame( animate );
     controls.update(); // Update controls
@@ -447,6 +477,13 @@ class UI{
     this.densityslider = document.getElementById("density-slider");
     this.densitycounter = document.getElementById("density");
     this.generatebutton = document.getElementById("generate-button");
+    this.colorbarmin = document.getElementById("colorbar-min");
+    this.colorbarmax = document.getElementById("colorbar-max");
+
+    this.colorbarmin.addEventListener("blur", () => {this.updateColorbar()})
+    this.colorbarmax.addEventListener("blur", () => {this.updateColorbar()})
+    this.colorbarmin.value =  this.RGBtoHex(this.lenia.mesh.colourbarmin)
+    this.colorbarmax.value =  this.RGBtoHex(this.lenia.mesh.colourbarmax)
 
     this.generatebutton.addEventListener("click", () => {
         if (this.seedinput.value.length === 8) {
@@ -546,21 +583,6 @@ class UI{
       });
 
 
-
-     /// this.seedbutton.addEventListener("click", () => {
-      //  const inputValue = this.seedinput.value;
-      //  if (!inputValue || inputValue.length !== 8) { return;}
-        
-      //  const value = parseInt(inputValue);
-      //  if (!isNaN(value)) {
-      //      this.lenia.seed = value;
-    //    }
-      //  
-      //  this.updateseed();
-      //  this.lenia.tensor.randomGrid();
-       // this.lenia.mesh.update();
-   // });
-
     this.reset.addEventListener("click", this.lenia.reset.bind(this.lenia))
     this.updatedim()
     this.PopulateAnimalList()
@@ -653,6 +675,14 @@ class UI{
         this.typedisplay.textContent = this.type;
         this.namedisplay.textContent = this.name;
       }
+    updateColorbar = () => {
+        console.log(this.colorbarmin.value)
+        console.log(this.colorbarmax.value)
+        this.lenia.mesh.colourbarmin = this.HextoRGB(this.colorbarmin.value)
+        this.lenia.mesh.colourbarmax = this.HextoRGB(this.colorbarmax.value)
+        console.log(this.lenia.mesh.colourbarmin)
+        console.log(this.lenia.mesh.colourbarmax)
+    }
       PopulateAnimalList() {
         if (!animalArr) return;
         var list = document.getElementById("AnimalList");
@@ -694,7 +724,6 @@ class UI{
                     li.addEventListener("click", this.SelectAnimalItem);
                 } else if (Object.keys(a).length == 3) {
                     var nextLevel = parseInt(codeSt.substring(1));
-                    console.log(nextLevel)
                     var diffLevel = nextLevel - currLevel;
                     var backNum = (diffLevel<=0) ? -diffLevel+1 : 0;
                     var foreNum = (diffLevel>0) ? diffLevel : 1;
@@ -710,7 +739,6 @@ class UI{
                     const arrow = div.appendChild(document.createElement("DIV"));
                     arrow.classList.add("arrow"); 
                     text.title = engSt;
-                    console.log(engSt)
                     text.innerHTML = engSt[engSt.length-1];
                     const scalar = Math.pow(8/9, nextLevel)
                     const fontsize = scalar*20
@@ -769,44 +797,84 @@ class UI{
         const range  = Array.from({ length: this.lenia.cluster_size.length + 1 }, (_, index) => index);
         this.populateParameters(this.clustercontainer,range,this.lenia.cluster_size.length,this.lenia.tensor.generateKernel.bind(this.lenia),[0,1,0.001])
     }
-    populateParameters(container,labels,values,eventhandler,ranges){
-     for (let i = 0; i < values.length; i++) { this.Addparameter(container,labels[i],values[i],eventhandler,ranges)}}
-    Addparameter(container,name,value,eventhandler,ranges){
-        let row = document.createElement("div");
-        let label = document.createElement("label");
-        label.textContent = name.toString()+": ";
-        row.classList.add("parameter-row"); 
-        let slider = document.createElement("input");
-        slider.type = "range";slider.min = ranges[0],slider.max = ranges[1];slider.step = ranges[2],slider.value = value;
-        let text = document.createElement("input");
-        text.type = "text";text.value = value;
+    populateParameters(container, labels, values, eventhandler, ranges) {
+        for (let i = 0; i < values.length; i++) {
+            this.Addparameter(container, labels, values, i,ranges, eventhandler);
+        }
+      }
+      
+    Addparameter(container, names, values, index,ranges, eventhandler) {
+        const row = document.createElement("div");
+        row.classList.add("parameter-row");
+      
+        const label = document.createElement("label");
+        label.textContent = names[index].toString() + ": ";
+        row.appendChild(label);
+      
+        const slider = document.createElement("input");
+        slider.type = "range";
+        slider.min = ranges[0];
+        slider.max = ranges[1];
+        slider.step = ranges[2];
+        slider.value = values[index];
         slider.style.width = "80%";
+        row.appendChild(slider);
+      
+        const text = document.createElement("input");
+        text.type = "text";
+        text.value = values[index];
         text.style.width = "10%";
         text.classList.add("seed-input");
-        row.appendChild(label);
-        row.appendChild(slider);
         row.appendChild(text);
+      
+        // Associate slider and text input using data attributes
+      
+        // Event listener for both slider and text input
+        const updateValue = (event) => {
+          const inputValue = parseInt(event.target.value);
+          values[index] = inputValue;
+          if (typeof eventhandler === 'function') {
+            eventhandler();
+          }
+        };
         slider.addEventListener("input", (event) => {
             const sliderValue = parseInt(event.target.value);
             text.value = sliderValue;
           });
-        if (typeof eventhandler === 'function'){
-        slider.addEventListener("change", (event) => {
-            const sliderValue = parseInt(event.target.value);
-            value = sliderValue;
-            eventhandler();
-          });
-          text.addEventListener("blur", (event) => {
-            const Value = parseInt(event.target.value);
-            slider.value = Value;
-            value = Value;
-            eventhandler();
-          });
-        }
-        container.append(row)
-     }
+        slider.addEventListener("change", updateValue);
+        text.addEventListener("blur", updateValue);
+      
+        container.appendChild(row);
+      }
     Removeparameter(container,i){
         container.removeChild(container.childNodes[i])
+    }
+    HextoRGB(hex) {
+        // Remove the '#' symbol if present
+        if (hex.charAt(0) === '#') {
+          hex = hex.substr(1);
+        }
+      
+        // Check if the input is a valid hexadecimal color code
+        const validHexPattern = /^[0-9a-fA-F]{6}$/;
+        if (!validHexPattern.test(hex)) {
+          throw new Error('Invalid hexadecimal color code');
+        }
+      
+        // Extract the individual color components
+        const r = parseInt(hex.substr(0, 2), 16);
+        const g = parseInt(hex.substr(2, 2), 16);
+        const b = parseInt(hex.substr(4, 2), 16);
+      
+        // Return the RGB array
+        return [r, g, b].map(x => x / 255);
+      }
+    RGBtoHex(rgbArray) {
+        const hex = rgbArray.reduce((acc, val) => {
+          const component = Math.round(val * 255).toString(16).padStart(2, '0');
+          return acc + component;
+        }, '');
+        return `#${hex}`;
     }
     
 }
@@ -842,7 +910,6 @@ class Load{
         this.lenia.UI.updateparams()
         this.lenia.UI.updatename()
         this.lenia.id = id
-        console.log(tf.memory().numTensors)
         if (state) {this.lenia.updatestate()}
     }
     SelectType(id) {
