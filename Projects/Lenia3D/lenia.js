@@ -4,9 +4,9 @@ const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.inner
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize( window.innerWidth, window.innerHeight );
 document.body.appendChild( renderer.domElement );
-camera.position.x = 1.2*64 ;
-camera.position.y = 1.2*64 ;
-camera.position.z = 1.2*64 ;
+camera.position.x = 0.8*64 ;
+camera.position.y = 0.8*64 ;
+camera.position.z = 0.8*64 ;
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; 
 controls.dampingFactor = 0.05; // Set the damping factor for the damping effect
@@ -43,7 +43,6 @@ const sliders = document.querySelectorAll('.slider');
 
 const animate = function () {
     requestAnimationFrame( animate );
-    controls.update(); // Update controls
     renderer.render( scene, camera );
   };
 class Lenia {
@@ -205,6 +204,7 @@ class tensor {
 
     generateKernel(){
         const SIZE = this.lenia.size
+        
         const error = SIZE.map(x=>x%2)
         const mid = SIZE.map(x=>Math.floor(x/2));
         let dummy = tf.tidy(() => {
@@ -587,8 +587,8 @@ class UI{
     this.updatedim()
     this.PopulateAnimalList()
     this.updateparams()
-    this.populateParameters(this.gridparamscontainer,["x","y","z"],this.lenia.size,this.lenia.tensor.updateGridSize.bind(this.lenia.tensor),[0,100,1])
-    this.populateParameters(this.clustercontainer,["x","y","z"],this.lenia.cluster_size,null,[0,100,1])
+    this.populateParameters(this.gridparamscontainer,["x","y","z"],this.lenia.size,[0,100,1],this.lenia.tensor.updateGridSize.bind(this.lenia.tensor))
+    this.populateParameters(this.clustercontainer,["x","y","z"],this.lenia.cluster_size,[0,100,1],null)
     this.generateClusterRange()
     this.updatedensity()
 }   
@@ -637,7 +637,9 @@ class UI{
     updatedim(){this.dimcounter.textContent = this.lenia.DIM;} 
     updateb() {
         this.lenia.tensor.generateKernel()
-        this.populateBParams()
+        this.bcontainer.innerHTML = ''
+        const range  = Array.from({ length: this.lenia.params['b'].length + 1 }, (_, index) => index);
+        this.populateParameters(this.bcontainer,range,this.lenia.params['b'],[0,1,0.001],this.lenia.tensor.generateKernel.bind(this.lenia.tensor))
         this.bdimcounter.textContent = this.lenia.params['b'].length;
       }
     updatem() { const value = this.lenia.params['m'];
@@ -676,12 +678,8 @@ class UI{
         this.namedisplay.textContent = this.name;
       }
     updateColorbar = () => {
-        console.log(this.colorbarmin.value)
-        console.log(this.colorbarmax.value)
         this.lenia.mesh.colourbarmin = this.HextoRGB(this.colorbarmin.value)
         this.lenia.mesh.colourbarmax = this.HextoRGB(this.colorbarmax.value)
-        console.log(this.lenia.mesh.colourbarmin)
-        console.log(this.lenia.mesh.colourbarmax)
     }
       PopulateAnimalList() {
         if (!animalArr) return;
@@ -785,19 +783,9 @@ class UI{
         } else {
           this.seedWarning.style.visibility = 'hidden';
         }
-      }
-    populateBParams(){
-        this.bcontainer.innerHTML = ''
-        const range  = Array.from({ length: this.lenia.params['b'].length + 1 }, (_, index) => index);
-        this.populateParameters(this.bcontainer,range,this.lenia.params['b'],this.lenia.tensor.generateKernel.bind(this.lenia),[0,1,0.001])
-    }
-    
-    populateClusterParams(){
-        this.clustercontainer.innerHTML = ''
-        const range  = Array.from({ length: this.lenia.cluster_size.length + 1 }, (_, index) => index);
-        this.populateParameters(this.clustercontainer,range,this.lenia.cluster_size.length,this.lenia.tensor.generateKernel.bind(this.lenia),[0,1,0.001])
-    }
-    populateParameters(container, labels, values, eventhandler, ranges) {
+        }
+        
+    populateParameters(container, labels, values,ranges, eventhandler) {
         for (let i = 0; i < values.length; i++) {
             this.Addparameter(container, labels, values, i,ranges, eventhandler);
         }
@@ -831,14 +819,14 @@ class UI{
       
         // Event listener for both slider and text input
         const updateValue = (event) => {
-          const inputValue = parseInt(event.target.value);
+          const inputValue = parseFloat(event.target.value);
           values[index] = inputValue;
           if (typeof eventhandler === 'function') {
-            eventhandler();
+            eventhandler(); 
           }
         };
         slider.addEventListener("input", (event) => {
-            const sliderValue = parseInt(event.target.value);
+            const sliderValue = parseFloat(event.target.value);
             text.value = sliderValue;
           });
         slider.addEventListener("change", updateValue);

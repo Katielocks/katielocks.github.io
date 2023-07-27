@@ -282,3 +282,28 @@ input[type="range"]::after {
         
       }
 
+    
+    #cluster-slider-range{
+      width: 100%;
+      margin: 0 auto;
+      height: 0.5rem;
+      background: #56575a;
+      border-radius: 20%;
+      border : none
+    }
+    
+    #cluster-slider-range  .ui-slider-range{
+      background: #56575a;
+      height: 0.5rem;
+      border-radius: 20%;
+      border: none; 
+    }
+
+    
+    #cluster-slider-range  .ui-slider-handle{
+      background-color: #b2b4b9;
+      height: 1rem;
+      width: 1rem;
+      border-radius : 50%;  
+      border:none;
+    }
