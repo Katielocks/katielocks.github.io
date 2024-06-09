@@ -58,6 +58,7 @@ class Lenia {
         this.isRunning = false;
         this.time = 0;
         this.gen = 0;
+        this.drawcall = renderer.info.render.calls;
         this.tensor = new tensor(this);
         this.mesh = new mesh(this);
         this.UI = new UI(this);
@@ -439,6 +440,7 @@ class UI{
     this.lenia = lenia
     this.gencounter = document.getElementById("gen");
     this.timecounter = document.getElementById("time");
+    this.drawcallcounter = document.getElementById("drawcall");
     this.rrange = [0,100,100]
     this.trange = [0,20,20]
     this.seedcontainer = document.getElementById("seedcont");
@@ -657,7 +659,7 @@ class UI{
     }
     updatetime(){this.timecounter.textContent = this.lenia.time.toFixed(2);}
     updategen(){this.gencounter.textContent = this.lenia.gen;}
-
+    updatedrawcall(){this.drawcallcounter.textContent = this.lenia.drawcall;}
     updateseed() {
         if (window.getComputedStyle(this.seedcontainer).display === "none") {
             this.seedcontainer.style.display = "block";
