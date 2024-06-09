@@ -43,8 +43,8 @@ const sliders = document.querySelectorAll('.slider');
 
 const animate = function () {
     requestAnimationFrame( animate );
-    drawcall = renderer.info.render.calls;
     renderer.render( scene, camera );
+    document.getElementById('drawcall').textContent = renderer.info.render.calls;
   };
 class Lenia {
     constructor() {
@@ -440,7 +440,6 @@ class UI{
     this.lenia = lenia
     this.gencounter = document.getElementById("gen");
     this.timecounter = document.getElementById("time");
-    this.drawcallcounter = document.getElementById("drawcall");
     this.rrange = [0,100,100]
     this.trange = [0,20,20]
     this.seedcontainer = document.getElementById("seedcont");
@@ -659,7 +658,6 @@ class UI{
     }
     updatetime(){this.timecounter.textContent = this.lenia.time.toFixed(2);}
     updategen(){this.gencounter.textContent = this.lenia.gen;}
-    updatedrawcall(){this.drawcallcounter.textContent = drawcall;}
     updateseed() {
         if (window.getComputedStyle(this.seedcontainer).display === "none") {
             this.seedcontainer.style.display = "block";
