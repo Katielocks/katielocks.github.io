@@ -63,6 +63,17 @@ class Lenia {
         this.mesh = new mesh(this);
         this.UI = new UI(this);
 
+        this.tensor.kernel.data().then(data => {
+        // Convert tensor to array and sort it in descending order
+        const sortedData = Array.from(data).sort((a, b) => b - a);
+    
+        // Get the top 40 values
+        const top40Values = sortedData.slice(0, 40);
+    
+        // Print the top 40 values
+        console.log("Top 40 values:", top40Values);
+    });
+
         }
         animatestate() {
             if (this.isRunning) {
