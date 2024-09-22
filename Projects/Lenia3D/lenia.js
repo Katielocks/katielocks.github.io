@@ -74,6 +74,9 @@ class Lenia {
         console.log("Top 40 values:", top40Values);
     });
 
+        console.log(this.params)
+        console.log(this.size)
+
         }
         animatestate() {
             if (this.isRunning) {
