@@ -1,81 +1,48 @@
 tf.setBackend('webgl')
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
-const renderer = new THREE.WebGLRenderer();
-renderer.setSize( window.innerWidth, window.innerHeight );
-document.body.appendChild( renderer.domElement );
-camera.position.x = 0.8*64 ;
-camera.position.y = 0.8*64 ;
-camera.position.z = 0.8*64 ;
-const controls = new THREE.OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true; 
-controls.dampingFactor = 0.05; // Set the damping factor for the damping effect
-scene.background = new THREE.Color(0x101214);
-
-
-
-const sliders = document.querySelectorAll('.slider');
-
-  function updateSliderTrack(event) {
-    const slider = event.target;
-    const value = (slider.value - slider.min) / (slider.max - slider.min);
-
-    // Calculate the width of the track to the left of the thumb
-    const trackWidth = value * 100;
-
-    // Set the background color for the left part of the track
-    const colorLeft = `linear-gradient(90deg, #00ff00 ${trackWidth}%, #555353 ${trackWidth}% 100%)`;
-
-    // Update the slider's pseudo-element style with the new background color
-    slider.style.setProperty('--track-color-left', colorLeft);
-  }
-
-  sliders.forEach(slider => {
-    // Initially set the background color based on the slider's initial value
-    updateSliderTrack({ target: slider });
-
-    // Add an event listener to each slider to update the background color when the value changes
-    slider.addEventListener('input', updateSliderTrack);
-  });
 
 
 
 
-const animate = function () {
-    requestAnimationFrame( animate );
-    renderer.render( scene, camera );
-    document.getElementById('drawcall').textContent = renderer.info.render.calls;
-  };
+
+
 class Lenia {
     constructor() {
         this.params = {'R':15, 'T':10, 'b':[1], 'm':0.1, 's':0.01, 'kn':1, 'gn':1};
         this.DIM = 3;
-        this.size = Array(this.DIM).fill(64);
+
+        this.render = '2D'
+
+        this.size = Array.from({ length: this.DIM }).fill(64);
+
+        this.paramsbackup = { ...this.params };
+        this.sizebackup = this.size.slice();
+
         this.cluster_size = this.size.map(x => x);
         this.cluster_density = 1
         this.cluster_range = [0,1]
+
+        this.colourbarmax = [253 / 255, 232 / 255, 64 / 255];
+        this.colourbarmin = [68 / 255, 13 / 255, 84 / 255];
+
+
         this.seed = null
         this.id = null
         this.isRunning = false;
         this.time = 0;
         this.gen = 0;
+        this.UI = new UI(this);
         this.tensor = new tensor(this);
         this.mesh = new mesh(this);
-        this.UI = new UI(this);
+        this.array = new array(this);
+        this.renderInit();
+        this.tensor.generateKernel();
 
-        this.tensor.kernel.data().then(data => {
-        // Convert tensor to array and sort it in descending order
-        const sortedData = Array.from(data).sort((a, b) => b - a);
-    
-        // Get the top 40 values
-        const top40Values = sortedData.slice(0, 40);
-    
-        // Print the top 40 values
-        console.log("Top 40 values:", top40Values);
-    });
 
-        console.log(this.params)
-        console.log(this.size)
+        this.UI.BindParameters(this.UI.bcontainer,this.params['b'],this.tensor.generateKernel.bind(this.tensor),"change")
+
+        this.UI.updateparams()
+
+        this.UI.editMenu(this.UI.menu,['AnimalWindow'])
 
         }
         animatestate() {
@@ -85,7 +52,7 @@ class Lenia {
               // Update the grid every 1/T seconds
               setTimeout(function() {
                 self.tensor.update();
-                const a = self.mesh.update();
+                self.renderUpdate();
                 self.animatestate();
                 this.gen += 1
                 this.time += 1/this.params['T']
@@ -93,7 +60,6 @@ class Lenia {
                 this.UI.updategen()
               }.bind(this), Math.floor(1000 / this.params['T']));
           
-              // Render your game objects here
             }
           }
           
@@ -109,24 +75,83 @@ class Lenia {
         }
         updatestate() {
             if (this.isRunning) {
-                this.UI.startstop.style.backgroundImage = "url('startbutton.png')";
                 this.stopstate();
             } else {
-                this.UI.startstop.style.backgroundImage = "url('pausebutton.png')";
                 this.startstate();
             }
         }
         reset() {
+            console.log('params',this.params)
+            this.resetparams();
+            console.log('params',this.params)
+            this.tensor.updateGridSize();
+            this.UI.updateparams();
+    
             if (this.id !== null) {
                 this.tensor.load.SelectAnimalID(this.id)
             }
             else{
                 this.tensor.randomGrid()
-                this.mesh.update(true)
+                this.renderUpdate()
             }
             this.time = 0;
             this.gen = 0;
         }
+        resetparams() {
+            this.params = { ...this.paramsbackup };
+            this.size = this.sizebackup.slice();
+        }
+        setparams(){
+            this.paramsbackup = { ...this.params };
+        }
+        colormap(value){
+            return this.colourbarmax.map(
+                (x, i) => (x - this.colourbarmin[i]) * value + this.colourbarmin[i]
+            );
+        }
+        
+
+        renderInit(){
+            if (this.render === '2D'){ this.array.init();; }
+            else if (this.render === '3D'){ this.mesh.init(); }
+        }
+        renderUpdate(){
+            if (this.render === '2D'){ this.array.update(); }
+            else if (this.render === '3D'){ this.mesh.update(); }
+        }
+        renderRemove(){
+            if (this.render === '2D'){ this.array.remove(); }
+            else if (this.render === '3D'){ this.mesh.remove(); }
+        }
+        renderReset(){
+            this.renderRemove()
+            this.renderInit()
+        }
+        renderBounds(inputValue, direction) {
+            if (this.render === '2D' && direction !== 2){ this.array.shouldRenderBounds = true, this.array.renderBoundsPotential = inputValue, this.array.renderBoundsDirection = (this.DIM - direction - 1) % this.DIM; 
+                this.array.update()
+            }
+            else if (this.render === '3D'){ this.mesh.renderBounds(inputValue,direction); }
+        }
+        renderRemoveBounds() {
+            if (this.render === '2D'){ this.array.removeBounds(); }
+            else if (this.render === '3D'){ this.mesh.removeBounds(); }
+        }
+        updateGridSize(input,direction) {
+            const values = this.size.slice().reverse();
+            values[direction] = input;
+            this.size = values.slice().reverse();
+            this.tensor.updateGridSize();
+            if (this.render === '2D'){ this.array.updateGridSize(); }
+            else if (this.render === '3D'){ this.mesh.updateGridSize(); }
+        }
+        canvasResize() {
+            
+            console.log('canvas resize triggered')
+            if (this.render === '2D'){ this.array.update(); }
+            else if (this.render === '3D'){ this.mesh.renderContainerSync(); }
+        }
+
 
 
 }
@@ -137,7 +162,6 @@ class tensor {
       this.lenia = lenia;
       this.init(true);
       this.load = new Load(this.lenia);
-
       this.kernel_core = {
         0: (r) => tf.tidy(() => tf.pow(tf.mul(tf.mul(4, r), tf.sub(1, r)), 4)), // polynomial (quad4)
         1: (r) => tf.tidy(() => tf.exp(tf.sub(4, tf.div(1, tf.mul(r, tf.sub(1, r)))))), // exponential / gaussian bump (bump4)
@@ -149,7 +173,8 @@ class tensor {
         1: (n, m,s) => tf.tidy(() => {return tf.sub(tf.mul(tf.exp(tf.div(tf.neg(tf.pow(tf.sub(n, m), 2)), tf.mul(2, tf.pow(s, 2))))), 1)}),  // exponential / gaussian (gaus)
         2: (n, m,s) => tf.tidy(() => {return tf.sub(tf.logicalAnd(tf.lessEqual(tf.abs(tf.sub(n, m)), s), 2), 1)})  // step (stpz)
       };
-        
+      this.generateKernel();
+
     }
     init(init = false) {
         if (init){this.grid = tf.tidy(() =>  {return tf.variable(tf.zeros(this.lenia.size))});}
@@ -286,8 +311,16 @@ class tensor {
             const new_grid = tf.mul(randomGrid,randomBoolGrid)
             return tf.cast(this.resize(new_grid,this.lenia.size),'float32')})
         this.grid.assign(new_grid)
-        this.lenia.mesh.update(true)
+        this.lenia.renderUpdate()
         new_grid.dispose()
+    }
+    generateRandomGrid(){
+        this.lenia.id = null;
+        this.lenia.time = 0;
+        this.lenia.gen = 0;
+        this.randomGrid();
+        this.lenia.renderUpdate();
+        this.lenia.UI.updateseed()
     }
     generateseed() {
         this.lenia.seed = Math.floor(Math.random() * Math.pow(10, 8));
@@ -296,7 +329,8 @@ class tensor {
         // Define the weights of the directional kernel
         return tf.tidy(() => {
             const padding = [[1, 1], [1, 1], [1, 1]];
-            const grid_bool = tf.notEqual(tf.pad(this.grid,padding),0)  
+            const tolerance = 1e-18;
+            const grid_bool = tf.greater(tf.pad(this.grid,padding), tolerance)
             let egrid = tf.real(this.ifftn(tf.mul(this.fftn(grid_bool.cast('complex64')), this.ekernel)))
             egrid = tf.round(egrid).slice(0,this.lenia.size)
         return  egrid.clipByValue(0,1).cast('int32')})
@@ -334,128 +368,382 @@ class tensor {
         }
         output = tf.stack(output)
         return output})}
+    Condense(){
+        return tf.tidy(()=>{ 
+            const Zaxis = this.grid.shape[0]
+            const CondensedGrid = this.grid.sum(0)
+            const NormalisedGrid = CondensedGrid.div(Zaxis)
+            return NormalisedGrid})
+        }
     updateGridSize() {
-        this.lenia.mesh.size = this.lenia.size.slice(-3)
-        this.lenia.mesh.offset = this.lenia.mesh.size.map(x=>(x-1)/2)
         tf.dispose([this.gridVoxel, this.ekernel, this.kernel]);
         const dummy = this.resize(this.grid, this.lenia.size);
         this.grid.dispose()
         this.grid = tf.variable(dummy);
         this.init();
-        scene.remove(this.lenia.mesh.mesh);
-        this.lenia.mesh.init();
-        scene.add(this.lenia.mesh.mesh);
-        this.lenia.mesh.update(true); // Pass the grid as a parameter
 
 
     }
 }
 
 class mesh {
-    constructor(lenia){
-        this.lenia = lenia
-        this.cubeProxy = new THREE.Object3D()
-        this.size = this.lenia.size.slice(-3)
-        const error = this.size.map(x=>Math.abs(x%2))
-        this.offset = this.size.map(x=>(x-1)/2)
-        this.init()
-        this.colourbarmax = [253/255,232/255,64/255]
-        this.colourbarmin = [68/255,13/255,84/255]
+    constructor(lenia) {
+        this.lenia = lenia;
+        this.cubeProxy = new THREE.Object3D();
+        this.canvas = document.getElementById('canvas-3d');
+        this.generateBounds()
+    }
 
+
+    addEventListeners() {
+        window.addEventListener('mousedown', (event) => this.onMouseDown(event));
+        window.addEventListener('mousemove', (event) => this.onMouseMove(event));
+        window.addEventListener('mouseup', () => this.isDrawing = false);
+        window.addEventListener('resize', () => this.renderContainerSync());
+    }
+
+    onMouseDown(event) {
+        this.isDrawing = true;
+        this.updateMousePosition(event);
+    }
+
+    onMouseMove(event) {
+        if (this.isDrawing) {
+            this.updateMousePosition(event);
+        }
+    }
+    updateMousePosition(event) {
+        this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    }
+    
+    animate() {
+            this.controls.update();
+            this.renderer.render(this.scene, this.camera);
+            this.needsRender = false;
+        requestAnimationFrame(this.animate.bind(this));
+    }
+  
+  
+    onChange() {
+      this.needsRender = true;
+    }
+
+    renderContainerSync() {
+        const width = this.canvas.clientWidth;
+        const height = this.canvas.clientHeight;
+
+        this.renderer.setSize(width, height,false); // Update the renderer size
+    
+        // Update the camera aspect ratio to match the canvas size
+        this.camera.aspect = width / height;
+        this.camera.updateProjectionMatrix();
+    
+        this.needsRender = true; // Trigger a re-render
     }
     init() {
-        this.mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial(), this.size.reduce((a, v) => a * v))
+        this.canvas.style.display = 'block';
+        this.size = this.lenia.size.slice(-3);
+        this.offset = this.size.map(x => (x - 1) / 2);
+        
+        this.raycaster = new THREE.Raycaster();
+        this.mouse = new THREE.Vector2();
+        this.scene = new THREE.Scene();
+        this.camera = new THREE.PerspectiveCamera( 75, this.canvas.clientWidth / this.canvas.clientHeight, 0.1, 1000 );
+        this.renderer = new THREE.WebGLRenderer({ alpha: true, canvas: this.canvas });
+        this.renderer.setClearColor(0x000000, 0); // 0 is the alpha value for full transparency
+        
+        this.camera.position.x = 0.8*64; ;
+        this.camera.position.y = 0.8*64; ;
+        this.camera.position.z = 0.8*64; ;
+        this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+        this.controls.enableDamping = true; 
+        this.controls.dampingFactor = 0.05; // Set the damping factor for the damping effect
+        
+        this.addEventListeners();
+        this.generateMesh();
+        this.scene.add(this.mesh);
+        this.renderContainerSync();
+        this.update(true);
+        this.animate();
+    }
+
+    generateMesh() {
+        this.mesh = new THREE.InstancedMesh(
+            new THREE.BoxGeometry(1, 1, 1),
+            new THREE.MeshBasicMaterial(),
+            this.size.reduce((a, v) => a * v)
+        );
+
+        const totalInstances = this.size.reduce((a, v) => a * v);
+        const matrices = new Float32Array(totalInstances * 16); // Store matrices in a Float32Array for batching
+
+        let index = 0;
         for (let i = 0; i < this.size[0]; i++) {
             for (let j = 0; j < this.size[1]; j++) {
                 for (let k = 0; k < this.size[2]; k++) {
-                    const coord = [i,j,k].map((x,index)=>x-this.offset[index])
+                    const coord = [i, j, k].map((x, idx) => x - this.offset[idx]);
                     this.cubeProxy.position.set(coord[0], coord[1], coord[2]);
-                    this.cubeProxy.scale.setScalar(0)
-                    this.cubeProxy.updateMatrix()
-                    const index = k+this.size[0]*j+i*this.size[0]*this.size[1]
-                    this.mesh.setMatrixAt(index, this.cubeProxy.matrix)
-        }   }   }
-        this.mesh.setColorAt(0, new THREE.Color(0, 0, 0));
+                    this.cubeProxy.scale.setScalar(0); // Initially scale to 0
+                    this.cubeProxy.updateMatrix();
+                    
+                    this.cubeProxy.matrix.toArray(matrices, index * 16); // Batch the matrix
+                    index++;
+                }
+            }
+        }
 
+        this.mesh.instanceMatrix.set(matrices); // Set all matrices at once
+        this.mesh.instanceMatrix.needsUpdate = true;
+        this.mesh.setColorAt(0, new THREE.Color(0, 0, 0)); // Initial color
+        this.mesh.instanceColor.needsUpdate = true;
     }
-    updatescalar(indices,scalar){
+
+    updateScalar(indices, scalar) {
+        const matrices = new Float32Array(indices.length * 16); // Batch the matrices
+
         for (let index = 0; index < indices.length; index++) {
-          let local = indices[index]
-          let meshindex = local[2]+this.size[0]*local[1]+local[0]*this.size[0]*this.size[1]
-          local = local.map((x,i)=>x-this.offset[i])
-          this.mesh.getMatrixAt(meshindex, this.cubeProxy.matrix)
-          this.cubeProxy.position.set(local[0], local[1], local[2]);
-          this.cubeProxy.scale.setScalar(scalar)
-          this.cubeProxy.updateMatrix()
-          this.mesh.setMatrixAt(meshindex, this.cubeProxy.matrix)
+            let local = indices[index];
+            let meshIndex = local[2] + this.size[0] * local[1] + local[0] * this.size[0] * this.size[1];
+            local = local.map((x, i) => x - this.offset[i]);
+
+            this.cubeProxy.position.set(local[0], local[1], local[2]);
+            this.cubeProxy.scale.setScalar(scalar);
+            this.cubeProxy.updateMatrix();
+
+            this.cubeProxy.matrix.toArray(matrices, index * 16);
+            this.mesh.setMatrixAt(meshIndex, this.cubeProxy.matrix);
+        }
+
+        this.mesh.instanceMatrix.needsUpdate = true; // Batch update
+    }
+
+    updateValues(indices, values) {
+        const colors = new Float32Array(indices.length * 3); // Batch the colors
+
+        for (let index = 0; index < indices.length; index++) {
+            const local = indices[index];
+            let meshIndex = local[2] + this.size[0] * local[1] + local[0] * this.size[0] * this.size[1];
+            const value = values[index];
+            const color = this.colorbar(value);
+
+            color.toArray(colors, index * 3);
+            this.mesh.setColorAt(meshIndex, color); // Update the color at the mesh index
+        }
+
+        this.mesh.instanceColor.needsUpdate = true; // Batch update colors
+    }
+
+    async update(init = false) {
+        if (!this.lenia.isRunning && !init) return;
+
+        const gridVoxelNew = this.lenia.tensor.edges();
+        const diffGrid = tf.sub(gridVoxelNew, this.lenia.tensor.gridVoxel);
+
+        const gridVoxelDel = tf.equal(diffGrid, -1);
+        const voxelIndicesDel = await tf.whereAsync(gridVoxelDel);
+        const voxelIndicesDelArr = voxelIndicesDel.arraySync();
+
+        const newGrid = tf.equal(diffGrid, 1);
+
+        const voxelIndicesNew = await tf.whereAsync(newGrid);
+        const voxelIndicesNewArr = voxelIndicesNew.arraySync();
+
+        const currGrid = tf.equal(diffGrid, 0);
+        const voxelIndices = await tf.whereAsync(currGrid);
+        const voxelIndicesArr = voxelIndices.arraySync();
+
+        const voxelValues = tf.gatherND(this.lenia.tensor.grid, voxelIndices);
+        const voxelValuesArr = voxelValues.arraySync();
+
+        this.updateScalar(voxelIndicesNewArr, 1);
+        this.updateScalar(voxelIndicesDelArr, 0);
+        this.updateValues(voxelIndicesArr, voxelValuesArr);
+
+        this.lenia.tensor.gridVoxel.assign(gridVoxelNew);
+        this.onChange();
+        tf.dispose([
+            voxelIndicesDel,
+            voxelIndicesNew,
+            voxelIndices,
+            voxelValues,
+            diffGrid,
+            gridVoxelNew,
+            gridVoxelDel,
+            newGrid,
+            currGrid,
+        ]);
+    }
+
+    colorbar(value) {
+        const color = new THREE.Color();
+        const colours = this.lenia.colormap(value);
+        color.setRGB(colours[0], colours[1], colours[2]);
+        return color;
+    }
+    generateBounds(){
+        const size = this.lenia.size.slice()
+        const box = new THREE.BoxGeometry(1,1,1);
+        const material = new THREE.MeshBasicMaterial({
+            color: 0xFFFF00, 
+            transparent: true, // Enable transparency
+            opacity: 0.5      // Adjust opacity (0 is fully transparent, 1 is fully opaque)
+          });
+          this.boundingbox = new THREE.Mesh(box, material);
+        
+    }
+    renderBounds(value,direction) {
+        if (!this.scene.children.includes(this.boundingbox)){this.scene.add(this.boundingbox);}
+        const size = this.lenia.size.map((dim, i) => (i === direction ? value : dim));
+        this.boundingbox.scale.set(...size);
+        this.boundingbox.needsUpdate = true;
+    }
+    removeBounds() {
+        this.scene.remove(this.boundingbox);
+    }
+    updateGridSize() {
+        this.remove();
+        this.init();
+    }
+
+    remove(){
+        this.canvas.style.display = 'none';
+        this.scene.remove(this.mesh);
+        this.renderer.dispose();
+        this.controls.dispose();
+        this.camera = null;
+        this.renderer = null;
+        this.controls = null;
+        this.mesh = null;
+        this.scene = null;
+    }
+}
+
+class array {
+    constructor(lenia) {
+        this.lenia = lenia;
+        this.canvas = document.getElementById('canvas-2d');
+        this.ctx = this.canvas.getContext('2d');
+        this.renderBoundsPotential = null;
+        this.renderBoundsDirection = null;
+        this.shouldRenderBounds = false;
+        this.cellSize= 16;
+        window.addEventListener('resize', () => this.update());
+    }
+
+    render() {
+        this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+        this.canvas.width = this.cellRows * this.cellSize
+        this.canvas.height = this.cellCols * this.cellSize
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.width);
+
+
+        if (this.shouldRenderBounds) {
+            this.renderBounds();
+        }
+
+        let rowStart = null, rowEnd = null, colStart = null, colEnd = null;
+
+        if (this.shouldRenderBounds){
+            rowStart =  this.offset[0];
+            rowEnd = this.x + this.offset[0];
+            colStart = this.offset[1];
+            colEnd = this.y + this.offset[1];
+        }
+        else{ rowStart = 0; rowEnd = this.cellRows; colStart = 0; colEnd = this.cellCols; }
+
+
+        // Loop to render cells
+        for (let i =  rowStart; i < rowEnd; i++) {
+            for (let j = colStart; j < colEnd; j++) {
+                const value = this.values[i * this.cellCols + j]; // Get value from cached array
+                const color = this.lenia.colormap(value);
+                const isVisible = value > 1e-18; // Example condition for visibility
+                
+                // Set the fill style; if not visible, set to transparent
+                if (isVisible) {
+                    this.ctx.fillStyle = `rgba(${color[0] * 255}, ${color[1] * 255}, ${color[2] * 255}, 1)`;
+                } else {
+                    this.ctx.fillStyle = `hsl(0,0%,7%)`;
+                }
+                this.ctx.fillRect(i * this.cellSize, j * this.cellSize, this.cellSize, this.cellSize);
+            }
         }
     }
-      
-    updatevalues(indices,values){
-      for (let index = 0; index < indices.length; index++) {
-        const local = indices[index]
-        const shape = this.lenia.size.slice(-3)
-        let meshindex = local[2]+shape[0]*local[1]+local[0]*shape[0]*shape[1]
-        const value = values[index]
-        const colour = this.colorbar(value)
-        this.mesh.setColorAt(meshindex, colour);
+    init(){
+        this.canvas.style.display = 'block';
+        this.x = this.lenia.size[2];
+        this.y = this.lenia.size[1];
 
-    }}
-    async update(init=false) {
-        if (this.lenia.isRunning === false && init === false) {return}
-        const gridVoxel_new = this.lenia.tensor.edges()
-        const diffgrid = tf.sub(gridVoxel_new,this.lenia.tensor.gridVoxel)
-
-        const gridVoxel_del = tf.equal(diffgrid,-1)
-        const voxelIndices_del = await tf.whereAsync(gridVoxel_del)
-        const voxelIndices_del_arr= voxelIndices_del.arraySync()
-
-        const newgrid = tf.equal(diffgrid,1)
-        const voxelIndices_new = await tf.whereAsync(newgrid)
-        const voxelIndices_new_arr = voxelIndices_new.arraySync()
-        const currgrid = tf.equal(diffgrid,0)
-        const voxelIndices = await tf.whereAsync(currgrid)
-        const voxelIndices_arr = voxelIndices.arraySync()
-
-        const voxelvalues = tf.gatherND(this.lenia.tensor.grid, voxelIndices)
-        const voxelvalues_arr = voxelvalues.arraySync()
-        this.updatescalar(voxelIndices_new_arr,1)
-        this.updatescalar(voxelIndices_del_arr,0)
-        this.updatevalues(voxelIndices_arr,voxelvalues_arr)
-        this.mesh.instanceMatrix.needsUpdate = true;
-        this.mesh.instanceColor.needsUpdate = true;
-        this.lenia.tensor.gridVoxel.assign(gridVoxel_new)
-        tf.dispose([
-          voxelIndices_del,
-          voxelIndices_new,
-          voxelIndices ,
-          voxelvalues,
-          diffgrid,
-          gridVoxel_new,
-          gridVoxel_del,
-          newgrid,
-          currgrid
-        ]);
-      }
-      colorbar(value){
-        const color = new THREE.Color()
-        const colours = this.colourbarmax.map((x,i)=>(x-this.colourbarmin[i])*value+this.colourbarmin[i])
-        color.setRGB(colours[0],colours[1],colours[2])
-        return color
-      }
-
+       
+    }
+    
+    update() {
+        this.x = this.lenia.size[2];
+        this.y = this.lenia.size[1];
+        /* this.cellSize = Math.min(this.canvas.clientHeight, this.canvas.clientWidth) / Math.max(this.x, this.y)   /*/
+        let relativeSize = null
+        if (this.shouldRenderBounds){relativeSize = Math.min(this.canvas.clientHeight, this.canvas.clientWidth) / 128}
+        else {relativeSize = Math.min(this.canvas.clientHeight, this.canvas.clientWidth) / Math.max(this.x, this.y);}
+        this.cellRows = Math.floor(this.canvas.clientWidth / relativeSize);
+        this.cellCols = Math.floor(this.canvas.clientHeight / relativeSize);
     
 
+        this.offset = [Math.floor((this.cellRows - this.x) / 2), Math.floor((this.cellCols - this.y) / 2)]
+        const arrayIndices = Array.from({ length: this.cellRows * this.cellCols }, (_, index) => {
+            const i = Math.floor(index / this.cellCols);
+            const j = index % this.cellCols;
+            return [(i+this.offset[0]) % this.y, (j+this.offset[1]) % this.x]; // Apply modulus to fit within array bounds
+        });
+        this.values = tf.tidy(() => {
+            let array = this.lenia.tensor.Condense();
+            const tfArrayIndices = tf.tensor(arrayIndices, null, 'int32');
+            const values = tf.gatherND(array, tfArrayIndices);
+            const valuesArray = values.arraySync();
+            return valuesArray;
+        });
+        this.render();
+    }
+    remove() {
+        this.canvas.style.display = 'none';
+        this.ctx.clearRect(0, 0, this.canvas.clientWidth/this.scale, this.canvas.clientHeight/this.scale);
+    }
+    renderBounds() {
+        this.ctx.fillStyle = 'rgba(242, 242, 242, 0.25)';
+        const size = this.lenia.size.map((dim, i) => (i === this.renderBoundsDirection ? this.renderBoundsPotential : dim));
+        const offset = [Math.floor((this.cellRows - size[2]) / 2), Math.floor((this.cellCols - size[1]) / 2)];
+        this.ctx.fillRect(offset[0] * this.cellSize, offset[1] * this.cellSize, size[2] * this.cellSize, size[1] * this.cellSize);
+        this.ctx.strokeStyle = 'rgba(242, 242, 242, 0.75)';
+        this.ctx.lineWidth = this.cellsize*2;
+        this.ctx.strokeRect(this.offset[0] * this.cellSize, this.offset[1] * this.cellSize, this.x * this.cellSize, this.y * this.cellSize);
+
+
+    }
+    removeBounds() {
+        this.shouldRenderBounds = false;
+        this.renderBoundsDirection = null;
+        this.renderBoundsPotential = null;
+        this.update();
+    }
+    updateGridSize() {
+        this.removeBounds();
+        this.update();
+        this.x = this.lenia.size[2];
+        this.y = this.lenia.size[1];
+    }
 }
 
 class UI{
     constructor(lenia){
-    this.gridparamscontainer = document.getElementById("gridparams");
+    this.main = document.getElementById('main');
+    this.menu = document.getElementById('menu');
+    this.playcontrol = document.getElementById('playcontrol');
+    this.sidebarmenu = document.querySelector('.sidebarmenu');
+    this.gridparamscontainer = document.getElementById("dimensions-container");
     this.lenia = lenia
     this.gencounter = document.getElementById("gen");
     this.timecounter = document.getElementById("time");
     this.rrange = [0,100,100]
-    this.trange = [0,20,20]
     this.seedcontainer = document.getElementById("seedcont");
     this.seeddisplay = document.getElementById("seed");
     this.namecontainer = document.getElementById("namecont");
@@ -463,20 +751,46 @@ class UI{
     this.typedisplay = document.getElementById("type");
     this.menuItems = document.querySelectorAll('.menu li a');
     this.containers = document.querySelectorAll('.container');
-    document.addEventListener('DOMContentLoaded', () => this.menuvar());
-    this.startstop = document.getElementById("startstop");
+
+    this.playButtons = document.querySelectorAll('#play-button-checkbox');
+    this.playButtons.forEach((button) => {
+        button.checked = false; // Initialize all buttons as unchecked
+    });
+    
+    
+    this.isbuttonchecked = false;
+    
+    this.playButtons.forEach((button) => {
+        button.addEventListener('change', () => { // Use 'change' instead of 'check'
+            // Check or uncheck all buttons based on the state of the clicked button
+            const allChecked = button.checked;
+    
+            // Set all buttons to the state of the clicked button
+            this.playButtons.forEach((btn) => {
+                btn.checked = allChecked; 
+            });
+    
+            // Run the appropriate function based on whether a button is checked or unchecked
+            if (allChecked && !this.isbuttonchecked) {
+                this.isbuttonchecked = true;
+                this.lenia.startstate().bind(this.lenia);
+            } else if (!allChecked && this.isbuttonchecked) {
+                this.isbuttonchecked = false;
+                this.lenia.stopstate().bind(this.lenia);
+            }
+        });
+    });
+
+    this.togglesidebarButton = document.getElementById('toggleSidebar')
+    this.togglelayoutButton = document.getElementById('toggleLayout')
+
+
     this.reset = document.getElementById("reset");
-    this.startstop.addEventListener("click", () => {this.lenia.updatestate()});
     this.gridsizecounter = document.getElementById("gridsize");
     this.radiuscounter = document.getElementById("radius");
-    this.timerescounter = document.getElementById("timeres");
     this.mucounter = document.getElementById("mu");
     this.sigmacounter = document.getElementById("sigma");
     this.seedinput = document.getElementById("seedinput");
-    this.radiusAddButton = document.getElementById("radius-add-button");
-    this.radiusSubButton = document.getElementById("radius-sub-button");
-    this.timeAddButton = document.getElementById("time-add-button");
-    this.timeSubButton = document.getElementById("time-sub-button");
     this.muslider = document.getElementById("mu-slider");
     this.sigmaslider = document.getElementById("sigma-slider");
     this.seedWarning = document.getElementById("seedwarning");
@@ -491,25 +805,16 @@ class UI{
     this.clusterinputmax = document.getElementById("cluster-max-value");
     this.densityslider = document.getElementById("density-slider");
     this.densitycounter = document.getElementById("density");
-    this.generatebutton = document.getElementById("generate-button");
-    this.colorbarmin = document.getElementById("colorbar-min");
-    this.colorbarmax = document.getElementById("colorbar-max");
+    
+    this.renderdimensionbutton = document.getElementById("render-dimension-button");
+    this.renderdimensionbutton.textContent = this.lenia.render;
+    this.renderdimensionbutton.addEventListener("click", () => { this.togglerRenderDimension() });  
 
-    this.colorbarmin.addEventListener("blur", () => {this.updateColorbar()})
-    this.colorbarmax.addEventListener("blur", () => {this.updateColorbar()})
-    this.colorbarmin.value =  this.RGBtoHex(this.lenia.mesh.colourbarmin)
-    this.colorbarmax.value =  this.RGBtoHex(this.lenia.mesh.colourbarmax)
+    this.seedinput.addEventListener("input" , () => {
+        this.seedinput.value = this.validateData(this.seedinput.value,'int',16)
+    });
 
-    this.generatebutton.addEventListener("click", () => {
-        if (this.seedinput.value.length === 8) {
-        this.lenia.seed  = parseInt(this.seedinput.value);}
-        else if (this.seedinput.value.length !== 8 && this.seedinput.value.length !== 0) {return}
-        if (this.seedinput.value.length === 0){this.lenia.tensor.generateseed()}
-        this.lenia.tensor.randomGrid();
-        this.lenia.mesh.update(true);
-        this.lenia.id = null;
-        this.updateseed()
-    })
+
 
     this.densityslider.addEventListener("change", () => {
         const Value = parseFloat(this.densityslider.value)
@@ -526,9 +831,6 @@ class UI{
         this.updatedensity();
         });
 
-
-
-
     this.clusterinputmin.addEventListener("change", () => {
         const Value = parseFloat(this.clusterinputmin.value)
         this.clusterValueMin = Value
@@ -539,35 +841,6 @@ class UI{
         this.clusterValueMax = Value
         $("#cluster-slider-range").slider("values", 1, Value);
     });
-
-    this.radiusAddButton.addEventListener("click", () => {
-        this.lenia.params['R'] = this.inc(this.lenia.params['R'], this.rrange,1)
-        this.updateradius();
-    });
-    
-    this.radiusSubButton.addEventListener("click", () => {
-        this.lenia.params['R'] = this.inc(this.lenia.params['R'], this.rrange,-1)
-        this.updateradius();
-    });
-    
-    this.timeAddButton.addEventListener("click", () => {
-        this.lenia.params['T'] = this.inc(this.lenia.params['T'], this.trange,1)
-        this.updatet();
-    });
-    
-    this.timeSubButton.addEventListener("click", () => {
-        this.lenia.params['T'] = this.inc(this.lenia.params['T'], this.trange,-1)
-        this.updatet();
-    });
-    
-    this.bdimaddbutton.addEventListener("click", () => {
-        this.lenia.params['b'].push(0)
-        this.updateb();
-    });
-    this.bdimsubbutton.addEventListener("click", () => {
-        this.lenia.params['b'].pop()
-        this.updateb();})
-
 
     this.muslider.addEventListener("change", () => {
         const Value = parseFloat(this.muslider.value) 
@@ -591,22 +864,90 @@ class UI{
         const sliderValue = parseFloat(this.sigmaslider.value)  ;
         this.sigmacounter.value = sliderValue;
       });
-      this.sigmacounter.addEventListener("blur", () => {
-        const Value = parseFloat(this.sigmacounter.value);
-        this.sigmaslider.value = Value;
-        this.lenia.params['m']  = Value;
-      });
+    this.sigmacounter.addEventListener("blur", () => {
+    const Value = parseFloat(this.sigmacounter.value);
+    this.sigmaslider.value = Value;
+    this.lenia.params['m']  = Value;
+    });
+
+    this.togglelayoutButton.addEventListener("click", () => {
+        this.toggleLayout();
+    });
+    this.togglesidebarButton.addEventListener("click", () => {
+        this.toggleSidebar();
+    });
+
+    this.transitions = {
+        'open': { nextState: 'reduced', width: '140px' },
+        'reduced': { nextState: 'collapsed', width: '41px' },
+        'collapsed': { nextState: 'open', width: '0px' }
+    };
+
+    this.sidebarState = '';
+    this.layoutState = '';
+
+    this.aspectRatio = window.innerWidth / window.innerHeight;
+    this.sidebarState = 'reduced'
+    this.layoutStateAuto = this.aspectRatio > 0.75 ? 'row' : 'column';
+    this.layoutState = this.layoutStateAuto;
+    this.updateLayoutDimensions();
+    this.sidebarmenu.classList.add(this.sidebarState, 'initialised');
+    this.main.style.left = this.transitions[this.sidebarState].width;
+    this.main.classList.add('initialised');
 
 
+    
+    window.addEventListener('resize', () => this.updateLayoutDimensions());
+    window.addEventListener('fullscreenchange', () => this.updateLayoutDimensions());
+    window.addEventListener('mozfullscreenchange', () => this.updateLayoutDimensions());
+    window.addEventListener('webkitfullscreenchange', () => this.updateLayoutDimensions());
+    window.addEventListener('msfullscreenchange', () => this.updateLayoutDimensions());
+
+
+    // Add event listener for sidebar collapse button with a timeout
+    document.querySelector('.sidebar-collapse-button').addEventListener('click', () => {
+        setTimeout(this.updateLayoutDimensions, 300);
+    });
     this.reset.addEventListener("click", this.lenia.reset.bind(this.lenia))
-    this.updatedim()
     this.PopulateAnimalList()
-    this.updateparams()
-    this.populateParameters(this.gridparamscontainer,["x","y","z"],this.lenia.size,[0,100,1],this.lenia.tensor.updateGridSize.bind(this.lenia.tensor))
-    this.populateParameters(this.clustercontainer,["x","y","z"],this.lenia.cluster_size,[0,100,1],null)
+    this.populateParameters(this.gridparamscontainer,["X","Y","Z"],this.lenia.size,[0,128,1],"parameter-row dimension-row",null)
     this.generateClusterRange()
     this.updatedensity()
+
+    this.bcontainer.innerHTML = ''
+    const range  = Array.from({ length: this.lenia.params['b'].length + 1 }, (_, index) => index);
+    this.populateParameters(this.bcontainer,range,this.lenia.params['b'],[0,1,0.001],"parameter-row beta-row",null)
+    this.bdimcounter.textContent = this.lenia.params['b'].length;
+
+
+    this.tbuttons =  Array.from(document.querySelectorAll('.time-bar .button'));
+    this.timeres = document.getElementById('timeres');
+
 }   
+editMenu(container, children) {
+
+    if (!container || !container.children) {
+        console.error('Invalid container element');
+        return;
+    }
+    // Convert container's children (HTMLCo llection) to an array
+    const childrenArray = Array.from(container.children);
+
+    // Hide all the child elements
+    childrenArray.forEach(child => {
+        child.style.display = 'none';
+    });
+
+    // Show only the elements whose IDs are in the children array
+    children.forEach(childId => {
+        const matchingChild = container.querySelector(`#${childId}`);
+        if (matchingChild) {
+            matchingChild.style.display = 'block';
+        } else {
+            console.warn(`Child with id "${childId}" not found in container.`);
+        }
+    });
+}
 
     updatedensity(){
         this.densityslider.value = this.lenia.cluster_density
@@ -630,6 +971,135 @@ class UI{
 
     }
 
+    toggleSidebar() {
+        const nextInfo = this.transitions[this.sidebarState];
+        this.sidebarmenu.classList.replace(this.sidebarState, nextInfo.nextState);
+        this.sidebarState = nextInfo.nextState;
+        this.main.style.left = this.transitions[this.sidebarState].width;
+        this.updateLayoutDimensions();
+    }
+
+    toggleLayout() {
+        this.layoutState = (this.layoutState === 'row') ? 'column' : 'row';
+        this.updateLayoutDimensions();
+        this.lenia.canvasResize();
+    }
+
+    rowLayout() {
+    if (this.main.classList.contains('row-main')) return;
+    else if (this.main.classList.contains('col-main')) {
+        this.main.classList.replace('col-main', 'row-main');}
+    else {
+        this.main.classList.add('row-main');}
+    }
+    columnLayout() {
+    if (this.main.classList.contains('col-main')) return;
+    else if (this.main.classList.contains('row-main')) {
+        this.main.classList.replace('row-main', 'col-main');}
+    else {
+        this.main.classList.add('col-main');}
+    }
+
+    updateLayoutDimensions() {
+        const sidebarWidth = parseInt(this.transitions[this.sidebarState].width, 10);
+        const mainHeight = window.innerHeight - 32;
+        const mainWidth = window.innerWidth - sidebarWidth;
+
+        this.main.style.height = `${mainHeight}px`;
+        this.main.style.width = `${mainWidth}px`;
+        if (this.layoutState === 'row') {
+            this.rowLayout();
+        } else {
+            this.main.style.height = `auto`;
+            this.columnLayout();
+        }
+
+    }
+
+    togglerRenderDimension() {
+        this.lenia.renderRemove();
+        this.lenia.render = (this.lenia.render === '2D') ? '3D' : '2D';
+        this.lenia.renderInit();
+        this.renderdimensionbutton.textContent = this.lenia.render;
+    }
+
+    validateData(value, type, slice = 0) {
+        // Convert value to string if it's not already
+        value = String(value);
+    
+        // Determine allowed characters and handle dots based on type
+        let allowedChars;
+        let dotAllowed = false;
+        if (type === 'int') {
+            allowedChars = '0-9';
+        } else if (type === 'float') {
+            allowedChars = '0-9.';
+            dotAllowed = true;
+        } else {
+            throw new Error('Invalid type specified');
+        }
+        // Remove any characters not allowed
+        value = value.replace(new RegExp(`[^${allowedChars}]`, 'g'), '');
+    
+        if (type === 'float' && dotAllowed) {
+            // Ensure only one dot is present
+            const dotIndex = value.indexOf('.');
+            if (dotIndex !== -1) {
+                const integerPart = value.slice(0, dotIndex);
+                const decimalPart = value.slice(dotIndex + 1);
+                value = `${integerPart}.${decimalPart.replace(/\./g, '')}`;
+            }
+        }
+        if (type === 'float' && value.includes('.') && slice > 0) {
+            // Truncate the decimal part to fit the slice
+            let [integerPart, decimalPart] = value.split('.');
+            decimalPart = decimalPart.slice(0, slice - integerPart.length);
+            value = `${integerPart}.${decimalPart}`;
+        } else if (slice > 0) {
+            // Slice the value to the desired length
+            value = value.slice(0, slice);
+        }
+        return value;
+    }
+    validateInput(input, type, numberRange) {
+        let value = input.value;
+        if (type === 'int') {
+            // Remove non-numeric characters and limit to 3 digits
+            const maxDigits = numberRange[1].toString().length;
+            value = this.validateData(value, 'int', maxDigits);
+            value = parseInt(value, 10);
+        } else if (type === 'float') {
+            // Remove non-numeric characters except for '.'
+            value = this.validateData(value, 'float', 5);
+            value = parseFloat(value);
+        }
+        if (!isNaN(value)) {
+            // Ensure the value is within the specified range
+            value = Math.min(Math.max(value, numberRange[0]), numberRange[1]);
+            input.value = value;
+        } else {
+            // Clear the input if the value is not a valid number
+            input.value = '';
+        }
+    }
+    validateCluster(input, numberRange) {
+        const isMin = input.id === "cluster-min-value";
+        const isMax = input.id === "cluster-max-value";
+    
+        if (isMin || isMax) {
+            const otherInputId = isMin ? "cluster-max-value" : "cluster-min-value";
+            const otherInput = document.getElementById(otherInputId);
+            const otherValue = otherInput.value ? parseFloat(otherInput.value) : numberRange[isMin ? 1 : 0];
+    
+            const adjustedRange = isMin
+                ? [numberRange[0], Math.min(otherValue, numberRange[1])]
+                : [Math.max(numberRange[0], otherValue), numberRange[1]];
+            validateInput(input, 'float', adjustedRange);
+        }
+    }
+
+
+
       menuvar() {
         this.menuItems.forEach((item, index) => {
             item.addEventListener('click', (e) => {
@@ -648,30 +1118,50 @@ class UI{
         });
     }
     updateradius() {this.radiuscounter.textContent = this.lenia.params['R'].toFixed(0);}
-    updatet() {this.timerescounter.textContent = this.lenia.params['T'].toFixed(0);}
-    updatedim(){this.dimcounter.textContent = this.lenia.DIM;} 
-    updateb() {
-        this.lenia.tensor.generateKernel()
-        this.bcontainer.innerHTML = ''
-        const range  = Array.from({ length: this.lenia.params['b'].length + 1 }, (_, index) => index);
-        this.populateParameters(this.bcontainer,range,this.lenia.params['b'],[0,1,0.001],this.lenia.tensor.generateKernel.bind(this.lenia.tensor))
-        this.bdimcounter.textContent = this.lenia.params['b'].length;
-      }
+        updatet() {
+            const value = this.lenia.params['T'];
+            for (let i = 0; i < this.tbuttons.length; i++) {
+                if (value === parseInt(this.tbuttons[i].innerText)) {
+                    this.tbuttons[i].classList.add('active');
+                } else {
+                    this.tbuttons[i].classList.remove('active');
+                }
+                this.timeres.value = value;
+            }
+        }
+    updatedim(){
+            this.dimcounter.textContent = this.lenia.DIM;
+            this.gridparamscontainer.textContent = '';
+            this.populateParameters(this.gridparamscontainer,["X","Y","Z"],this.lenia.size,[0,128,1],"parameter-row dimension-row",null)
+            this.BindParameters(this.gridparamscontainer,this.lenia.size.slice().reverse(),this.lenia.updateGridSize.bind(this.lenia),"change")
+            this.BindParameters(this.gridparamscontainer,this.lenia.size.slice().reverse(),this.lenia.renderBounds.bind(this.lenia),"input")
+            this.BindParameters(this.gridparamscontainer,this.lenia.size.slice().reverse(),this.lenia.renderRemoveBounds.bind(this.lenia),"mouseup")
+            this.BindParameters(this.gridparamscontainer,this.lenia.size.slice().reverse(),this.lenia.renderRemoveBounds.bind(this.lenia),"touchend")
+
+    }   
     updatem() { const value = this.lenia.params['m'];
                 this.mucounter.value = value;
                 this.muslider.value  = value;}
     updates() {const value = this.lenia.params['s'];
                 this.sigmacounter.value = value;
                 this.sigmaslider.value  = value;}
+
+    updateb() {const values = this.lenia.params['b'];
+                this.bdimcounter.textContent = values.length;
+                this.bcontainer.innerHTML = '';
+                const range  = Array.from({ length: values.length + 1 }, (_, index) => index);
+                this.populateParameters(this.bcontainer,range,values,[0,1,0.001],"parameter-row beta-row",this.lenia.tensor.generateKernel.bind(this.lenia.tensor));
+                this.lenia.tensor.generateKernel();}
     updateparams() {
         this.updateradius();
         this.updatet();
         this.updatem();
         this.updates();
         this.updateb();
+        this.updatedim();
     }
-    updatetime(){this.timecounter.textContent = this.lenia.time.toFixed(2);}
-    updategen(){this.gencounter.textContent = this.lenia.gen;}
+    updatetime(){this.timecounter.textContent = this.lenia.time.toFixed(2)+'s';}
+    updategen(){this.gencounter.textContent = 'f ' + this.lenia.gen;}
     updateseed() {
         if (window.getComputedStyle(this.seedcontainer).display === "none") {
             this.seedcontainer.style.display = "block";
@@ -692,8 +1182,8 @@ class UI{
         this.namedisplay.textContent = this.name;
       }
     updateColorbar = () => {
-        this.lenia.mesh.colourbarmin = this.HextoRGB(this.colorbarmin.value)
-        this.lenia.mesh.colourbarmax = this.HextoRGB(this.colorbarmax.value)
+        this.lenia.colourbarmin = this.HextoRGB(this.colorbarmin.value)
+        this.lenia.colourbarmax = this.HextoRGB(this.colorbarmax.value)
     }
       PopulateAnimalList() {
         if (!animalArr) return;
@@ -724,13 +1214,18 @@ class UI{
                     li.classList.add("action");
                     li.classList.add("parameter-row");
                     const text = li.appendChild(document.createElement("DIV"));
+                    text.style.position = "absolute";
+                    text.style.left = "0";
+                    text.style.marginLeft = "2vw";
                     const code = li.appendChild(document.createElement("DIV"));
+                    code.style.position = "absolute";
+                    code.style.right = "0";
                     text.title = a[0] + " " + engSt.join(" ") + "\n" + ruleSt;
                     if (sameCode) codeSt = " ".repeat(codeSt.length);
                     if (sameEng0) engSt[0] = lastEng0.substring(0, 1) + ".";
                     text.innerHTML = engSt.join(" ");
                     li.style.color = "#cdd0d6"
-                    li.style.width = "90%"
+                    li.style.width = "calc(100% - 2vw)";
                     code.innerHTML = codeSt;
                     li.dataset["animalid"] = i;
                     li.addEventListener("click", this.SelectAnimalItem);
@@ -748,6 +1243,9 @@ class UI{
                     var div = node.appendChild(document.createElement("DIV"));
                     div.classList.add("parameter-row");
                     const text = div.appendChild(document.createElement("DIV"));
+                    text.style.position = "absolute";
+                    text.style.left = "0";
+                    text.style.marginLeft = "1vw";
                     const arrow = div.appendChild(document.createElement("DIV"));
                     arrow.classList.add("arrow"); 
                     text.title = engSt;
@@ -787,30 +1285,27 @@ class UI{
         this.lenia.tensor.load.SelectAnimalID(id);
       if (rundummy) {this.lenia.updatestate()}
     }
-    validateSeedInput(input) {
-        const seedLength = input.value.length;
-        // Remove any non-numeric characters from the input value
-        input.value = input.value.replace(/\D/g, '');
-        input.value = input.value.slice(0, 8);
-        if (seedLength < 8 && seedLength > 0) {
-          this.seedWarning.style.visibility = 'visible';
-        } else {
-          this.seedWarning.style.visibility = 'hidden';
-        }
-        }
         
-    populateParameters(container, labels, values,ranges, eventhandler) {
+    populateParameters(container, labels, values,ranges,classnames,eventhandler) {
         for (let i = 0; i < values.length; i++) {
-            this.Addparameter(container, labels, values, i,ranges, eventhandler);
+            this.Addparameter(container, labels, values, i,ranges,classnames,eventhandler);
         }
       }
       
-    Addparameter(container, names, values, index,ranges, eventhandler) {
+    Addparameter(container, names, values, index,ranges, classnames,eventhandler) {
+
+        const parameterType = Number.isInteger(ranges[2]) ? 'int' : 'float';
+        const allowedChars = parameterType === 'int' ? '0-9' : '0-9.';
+        const sliceValue = parameterType === 'int' ? ranges[1].toString().length : 5;
+
         const row = document.createElement("div");
-        row.classList.add("parameter-row");
+        classnames.split(" ").forEach(classname => {
+            row.classList.add(classname);
+        });
       
         const label = document.createElement("label");
-        label.textContent = names[index].toString() + ": ";
+        label.classList.add("paras-label");
+        label.textContent = names[index].toString()
         row.appendChild(label);
       
         const slider = document.createElement("input");
@@ -819,38 +1314,62 @@ class UI{
         slider.max = ranges[1];
         slider.step = ranges[2];
         slider.value = values[index];
-        slider.style.width = "80%";
         row.appendChild(slider);
       
         const text = document.createElement("input");
         text.type = "text";
         text.value = values[index];
-        text.style.width = "10%";
-        text.classList.add("seed-input");
+        text.classList.add("para-input");
+        text.addEventListener("input", () => {
+            text.value = this.validateData(text.value, parameterType, sliceValue);
+        });
+        text.style.width = `${sliceValue + 1}ch`;
+        text.addEventListener("blur", () => {this.validateInput(text, parameterType, ranges);});
         row.appendChild(text);
       
         // Associate slider and text input using data attributes
       
         // Event listener for both slider and text input
-        const updateValue = (event) => {
-          const inputValue = parseFloat(event.target.value);
-          values[index] = inputValue;
-          if (typeof eventhandler === 'function') {
-            eventhandler(); 
-          }
-        };
+        if (eventhandler) {this.BindParameter(row, values, index, eventhandler)}
+
         slider.addEventListener("input", (event) => {
             const sliderValue = parseFloat(event.target.value);
             text.value = sliderValue;
           });
-        slider.addEventListener("change", updateValue);
-        text.addEventListener("blur", updateValue);
       
         container.appendChild(row);
       }
     Removeparameter(container,i){
         container.removeChild(container.childNodes[i])
     }
+    BindParameters(container, values, eventhandler,eventSource) {
+        for (let i = 0; i < values.length; i++) {
+            const rows = container.querySelectorAll('.parameter-row');
+            let row = rows[i]; // Get the correct row by index
+
+            this.BindParameter(row, values,i, eventhandler,eventSource); // Bind each parameter in the container
+        }
+    }
+    BindParameter(row, values, index, eventhandler,eventSource) {
+        console.log('eventSource',eventSource)
+        const slider = row.querySelector("input[type='range']"); // Get the slider input
+        const text = row.querySelector(".para-input"); // Get the text input
+        const updateValue = (event) => { 
+            this.validateInput(event.target, 'int', [slider.min, slider.max]);
+            const inputValue = parseFloat(event.target.value);  
+            let parameters = [inputValue, index,values];
+            parameters = parameters.slice(0, eventhandler.length);  
+            if (typeof eventhandler === 'function') {
+                eventhandler(...parameters)
+            }
+        };
+        // Bind event handler to both slider and text input
+
+        slider.addEventListener(eventSource, updateValue);
+        text.addEventListener(eventSource, updateValue);
+    }
+
+
     HextoRGB(hex) {
         // Remove the '#' symbol if present
         if (hex.charAt(0) === '#') {
@@ -908,7 +1427,7 @@ class Load{
         this.lenia.params = Object.assign({}, a['params'])
         this.lenia.params['b'] = this.st2fracs(this.lenia.params['b'])
         dummy.dispose();
-        this.lenia.mesh.update(true);
+        this.lenia.renderUpdate()
         this.lenia.UI.updateparams()
         this.lenia.UI.updatename()
         this.lenia.id = id
@@ -1034,15 +1553,13 @@ class Load{
 }
 
 const lenia = new Lenia();
-scene.add(lenia.mesh.mesh);
 if (animalArr !== null) {
     lenia.tensor.load.SelectAnimalID(40);
   } else {
     lenia.tensor.randomGrid()
     lenia.tensor.generateKernel();
-    lenia.mesh.update(true);
   }
-animate();
+lenia.renderUpdate(true);
 
 
 
