@@ -414,7 +414,8 @@ input[type="range"]::-ms-fill-upper {
   .col-main .sim-topbar{
     position: absolute;
     margin : 0 var(--col-margin);
-    height :100%;
+    height :var(--col-margin);
+    width : 100%
   }
   .col-main .bottom-bar{
     position : absolute;
