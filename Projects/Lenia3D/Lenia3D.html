@@ -3,16 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,height=device-height, initial-scale=1.0">
-  <script type="text/javascript" src="animals3D.js"></script>
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <script src="https://code.jquery.com/ui/1.13.0/jquery-ui.min.js"></script>
-  <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.0/themes/base/jquery-ui.css">
-  <script type="text/javascript" id="MathJax-script" async
-  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
-  </script>
+  <script type="text/javascript" src="./dist/animals3D.js"></script>
   <title>Lenia3D</title>
   <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="./public/styles.css">
 </head>
 <body>
 <div id = "wrapper" class = "wrapper">
@@ -40,7 +34,7 @@
     <div id="playcontrol" class="play-controls-topbar">
       <label id="play-button" class="play-button-topbar">
         <input type="checkbox" id="play-button-checkbox" class="play-button-checkbox" hidden>
-        <img src="images/startbutton.png" class="play-button-image">
+        <img src="./public/assets/images/startbutton.png" class="play-button-image">
       </label>
       <button class="button reset-button" onclick="lenia.reset()" id ="reset"></button>
     </div>
@@ -50,13 +44,13 @@
       <ul class="sidebarmenu">
         <li class="nav-item">
           <a class="nav-link" aria-current="page" href="#" onclick="lenia.UI.toggleMenu('generate')" aria-label="Generate">
-            <img src="images/generate.png" id = "generate" alt="Generate Icon" class="nav-icon">
+            <img src="./public/assets/images/generate.png" id = "generate" alt="Generate Icon" class="nav-icon">
             <span class="nav-link-text">Generate</span>
           </a>
         </li>
         <li class="nav-item">
           <a class="nav-link" href="#"  onclick="lenia.UI.toggleMenu('edit')" aria-label="Edit">
-            <img src="images/edit.png" id = "edit" alt="Edit Icon" class="nav-icon">
+            <img src="./public/assets/images/edit.png" id = "edit" alt="Edit Icon" class="nav-icon">
             <span class="nav-link-text">Edit</span>
           </a>
         </li>
@@ -108,7 +102,7 @@
             </div>
             <div class="parameter-row">
               <label class="paras-label" style="font-size:1.5vh; width : 8ch;min-width: 8ch;"  for="ClusterSizeZ">Density</label>
-              <input type="range" class = "singlar-range" id="densityslider" min="0" max="1" step="0.001">
+              <input type="range" class = "single-range" id="densityslider" min="0" max="1" step="0.001">
               <input id="densitytext" type="text" class="para-input">
             </div>
       </div>
@@ -151,12 +145,12 @@
             </div>
             <div class="parameter-row growth-row">
               <label class="paras-label" for="mu">&mu;</label>
-              <input type="range" class = "singlar-range" id="muslider" min="0" max="1" step="0.0001">
+              <input type="range" class = "single-range" id="muslider" min="0" max="1" step="0.0001">
               <input id="mutext" type="text" class="para-input" style="width: 6ch">
             </div>
             <div class="parameter-row growth-row">  
               <label class="paras-label" for="sigma">&sigma;</label>
-              <input type="range" class = "singlar-range" id="sigmaslider" min="0" max="1" step="0.0001">
+              <input type="range" class = "single-range" id="sigmaslider" min="0" max="1" step="0.0001">
               <input id="sigmatext" type="text" class="para-input" style="width: 6ch">
             </div>
 
@@ -202,7 +196,7 @@
           <div id="playcontrol" class="play-controls">
             <label id="play-button" class="play-button">
               <input type="checkbox" id="play-button-checkbox" class="play-button-checkbox" hidden>
-              <img src="images/startbutton.png" class="play-button-image">
+              <img src="./public/assets/images/startbutton.png" class="play-button-image">
             </label>
             <button class="button reset-button" id ="reset" onclick="lenia.reset()"  ></button>
           </div>
@@ -213,9 +207,23 @@
     </div>
   </div>
 </div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r132/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three/examples/js/controls/OrbitControls.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-<script src = "lenia.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs/dist/tf.min.js"> </script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgpu/dist/tf-backend-webgpu.js"></script>
+
+<script type="module">
+  import { Lenia } from './dist/lenia.js';
+  
+  window.lenia = new Lenia();
+  
+  // …
+  if (animalArr !== null) {
+    window.lenia.tensor.load.SelectAnimalID(40);
+  } else {
+    window.lenia.tensor.randomGrid();
+    window.lenia.tensor.generateKernel();
+  }
+  
+  window.lenia.renderUpdate(true);
+</script>
 </body>
 </html>
