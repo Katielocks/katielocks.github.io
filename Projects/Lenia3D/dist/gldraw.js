@@ -256,3 +256,17 @@ export function syncWait(gl) {
         });
     });
 }
+export function resetFramebuffer(canvas) {
+    var _a;
+    if (!canvas) {
+        throw new Error('Canvas is required');
+    }
+    const gl = canvas.getContext('webgl2');
+    if (!gl) {
+        throw new Error('WebGL2 context not found');
+    }
+    if (!processor || ((_a = processor.gl) === null || _a === void 0 ? void 0 : _a.canvas) !== canvas) {
+        throw new Error('Processor not initialized for this canvas. Call drawTexture first.');
+    }
+    processor.resetFrameBuffer();
+}

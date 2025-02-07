@@ -1,4 +1,4 @@
-import { drawTexture, syncWait } from './gldraw.js';
+import { drawTexture, syncWait,resetFramebuffer } from './gldraw.js';
 
 // Pass a `WebGLData` object and specify a shape yourself.
 
@@ -8,7 +8,7 @@ import { drawTexture, syncWait } from './gldraw.js';
 // downloading the values.
 
 // Example for WebGL2:
-const customCanvas = document.getElementById('canvas-3d');
+const customCanvas = document.getElementById('canvas');
 const customBackend = new tf.MathBackendWebGL(customCanvas);
 tf.registerBackend('custom-webgl', () => customBackend);
 const gl = customCanvas.getContext('webgl2');
@@ -43,8 +43,7 @@ const gl = customCanvas.getContext('webgl2');
             this.UI = new UI(this);
             this.tensor = new tensor(this);
             this.mesh = new mesh(this);
-            this.array = new array(this);
-            this.renderInit();
+            this.mesh.render    ();
             this.tensor.generateKernel();
 
             this.tensorarray = []
@@ -65,7 +64,7 @@ const gl = customCanvas.getContext('webgl2');
                     this.tensor.update()
                     this.gen += 1
                     this.time += 1/this.params['T'] 
-                    if (this.gen % this.framesper ==- 0) {this.renderUpdate()};
+                    if (this.gen % this.framesper ==- 0) {this.mesh.render()};
                     this.UI.updatetime()
                     this.UI.updategen()
                     this.UI.updateframe()
@@ -122,45 +121,6 @@ const gl = customCanvas.getContext('webgl2');
             }
             
 
-            renderInit(){
-                if (this.render === '2D'){ this.array.init();; }
-                else if (this.render === '3D'){ this.mesh.init(); }
-            }
-            renderUpdate(init = false) {
-                if (this.render === '2D') { this.array.update();
-                } else if (this.render === '3D') { this.mesh.update(init);}
-            }
-            renderRemove(){
-                if (this.render === '2D'){ this.array.remove(); }
-                else if (this.render === '3D'){ this.mesh.remove(); }
-            }
-            renderReset(){
-                this.renderRemove()
-                this.renderInit()
-            }
-            renderBounds() {
-                if (this.render === '2D' && this.UI.inputIndex !== 2){ this.array.shouldRenderBounds = true, this.array.renderBoundsPotential = this.UI.inputValue, this.array.renderBoundsDirection = this.UI.inputIndex
-                    this.array.update()
-                }
-                else if (this.render === '3D'){ this.mesh.renderBounds(); }
-            }
-            renderRemoveBounds() {
-                if (this.render === '2D'){ this.array.removeBounds(); }
-                else if (this.render === '3D'){ this.mesh.removeBounds(); }
-            }
-            updateGridSize() {
-
-                this.size[this.UI.inputIndex] = this.UI.inputValue;
-                this.tensor.updateGridSize();
-                if (this.render === '2D'){ this.array.updateGridSize(); }
-                else if (this.render === '3D'){ this.mesh.updateGridSize(); }
-            }
-            canvasResize() {
-                
-                if (this.render === '2D'){ this.array.update(); }
-                else if (this.render === '3D'){ this.mesh.renderContainerSync(); }
-            }
-
 
 
     }
@@ -207,100 +167,138 @@ const gl = customCanvas.getContext('webgl2');
             return this.fftn(kernel.cast('complex64'));
             });
         }
-        transposecomplex(tensor,perms){
-            return tf.tidy(()=>{
-            let real = tf.real(tensor).reshape(tensor.shape).transpose(perms)
-            let imag = tf.imag(tensor).reshape(tensor.shape).transpose(perms)
-            return tf.complex(real,imag)
-            })
-        }
-        
-        fft1(tensor,perms){
-            return  tf.tidy(() => {
-                let fttensor = tf.spectral.fft(this.transposecomplex(tensor,perms))
-            return this.transposecomplex(fttensor,perms)})
-        }
-        
-        fftn(tensor){
+        transposeComplex(tensor, perm) {
             return tf.tidy(() => {
-                let perms = tf.range(0,tensor.shape.length,1).arraySync()
-                let fttensor = tensor
-                for (let i=0;i<perms.length;i++){
-                    const realign = perms.slice();
-                    [realign[realign.length-1],realign[i]] = [realign[i],realign[realign.length-1]];
-                    fttensor =  this.fft1(fttensor,realign)
-                }
-                return fttensor})
-        }
+              const realPart = tf.real(tensor).reshape(tensor.shape).transpose(perm);
+              const imagPart = tf.imag(tensor).reshape(tensor.shape).transpose(perm);
+              return tf.complex(realPart, imagPart);
+            });
+          }
         
-        ifft1(tensor,perms){
-            return  tf.tidy(() => {
-            let fttensor = tf.spectral.ifft(this.transposecomplex(tensor,perms))
-            return this.transposecomplex(fttensor,perms)})
-        }
-        
-        ifftn(tensor){
+          fftAlongAxis(x, axis) {
             return tf.tidy(() => {
-                let perms = tf.range(0,tensor.shape.length,1).arraySync()
-                let fttensor = tensor
-                for (let i=0;i<perms.length;i++){
-                    const realign = perms.slice();
-                    [realign[realign.length-1],realign[realign.length-1-i]] = [realign[realign.length-1-i],realign[realign.length-1]];
-                    fttensor =  this.ifft1(fttensor,realign)
-                }
-                return fttensor})
+              const rank = x.shape.length;
+              const perm = Array.from({ length: rank }, (_, i) => i);
+              [perm[axis], perm[rank - 1]] = [perm[rank - 1], perm[axis]];
+              console.log(perm)
+              const transposed = this.transposeComplex(x, perm);
+              const freq = tf.spectral.fft(transposed);
+              return this.transposeComplex(freq, perm);
+            });
+          }
+        
+          fftn(x) {
+            return tf.tidy(() => {
+              const rank = x.shape.length;
+              let out = x;
+              for (let axis = 0; axis < rank; axis++) {
+                out = this.fftAlongAxis(out, axis);
+              }
+              return out;
+            });
+          }
+        
+        ifftAlongAxis(x, axis) {
+            return tf.tidy(() => {
+              const rank = x.shape.length;
+              const perm = Array.from({ length: rank }, (_, i) => i);
+              [perm[axis], perm[rank - 1]] = [perm[rank - 1], perm[axis]];
+          
+              const transposed = this.transposeComplex(x, perm);
+              const time = tf.spectral.ifft(transposed);
+          
+              return this.transposeComplex(time, perm);
+            });
+          }
+        
+        ifftn(x) {
+            return tf.tidy(() => {
+              const rank = x.shape.length;
+              let out = x;
+              for (let axis = 0; axis < rank; axis++) {
+                out = this.ifftAlongAxis(out, axis);
+              }
+              return out;
+            });
         }
 
-        generateKernel(){
-            const SIZE = this.lenia.size
-            
-            const error = SIZE.map(x=>x%2)
-            const mid = SIZE.map(x=>Math.floor(x/2));
-            let dummy = tf.tidy(() => {
-                let D = tf.zeros(SIZE);
-                for (let i = 0; i < SIZE.length; i++){
-                    let x = tf.range(-mid[i],mid[i]+error[i],1)
-                    const reshapearr = Array.from(SIZE, (value, index) => (index === i ? value: 1))
-                    const tilearr  = Array.from(SIZE, (value, index) => (index !== i ? value: 1))
-                    x= x.reshape(reshapearr).tile(tilearr);
-                    x = tf.pow(x,2)
-                    D = tf.add(D,x)
-                }
-                D = tf.div(tf.sqrt(D),this.lenia.params['R'])
-                let K = this.kernel_shell(D);
-                K = this.roll(K.div(K.sum()), [0,1,2], mid)
-                return this.fftn(K.cast('complex64'));
-            })
-            this.kernel.assign(dummy)
-            dummy.dispose()
-        }
-
-        kernel_shell(r){
-            return tf.tidy(() => {
-            const B = this.lenia.params['b'].length
-            const Br = tf.mul(B,r);
-            const bs  = this.lenia.params['b']
-            const b = this.map(bs,tf.minimum(tf.floor(Br).cast('int32'),B-1))
         
-            const kfunc = this.kernel_core[this.lenia.params['kn'] - 1]
-            return tf.mul(tf.mul(tf.less(r,1),kfunc(tf.minimum(tf.mod(Br,1),1))),b)})
-        }
+          createCoordinateGrids(size) {
+            const rank = size.length;
+            const coords = [];
+            for (let i = 0; i < rank; i++) {
+              const mid = Math.floor(size[i] / 2), extra = size[i] % 2;
+              let range = tf.range(-mid, mid + extra, 1);
+              const shape = Array(rank).fill(1);
+              shape[i] = size[i];
+              range = range.reshape(shape);
+              const tile = size.map((val, idx) => (idx === i ? 1 : val));
+              coords.push(range.tile(tile));
+            }
+            return coords;
+          }
+        
+          createDistanceField(size, R) {
+            const coords = this.createCoordinateGrids(size);
+            let D = tf.zeros(size);
+            coords.forEach(coord => { D = D.add(coord.square()); });
+            return D.sqrt().div(R);
+          }
+        
+          kernelShell(r, params, kernelCoreFn) {
+            return tf.tidy(() => {
+              const bs = tf.tensor1d(params.b, 'float32');
+              const B = bs.shape[0];
+              const Br = r.mul(B);
+              const floorBr = Br.floor();
+              const idx = tf.minimum(floorBr, B - 1);
+              const bVals = bs.gather(idx.cast('int32'));
+              const fraction = Br.mod(1);
+              const mask = r.less(1);
+              const kfuncVals = kernelCoreFn(fraction);
+              return mask.mul(kfuncVals).mul(bVals);
+            });
+          }
+        
+          generateKernel() {
+            const { size, params } = this.lenia;
+            const kfunc = this.kernel_core[params.kn - 1];
+            const dummy = tf.tidy(() => {
+              const D = this.createDistanceField(size, params.R);
+              let K = this.kernelShell(D, params, kfunc);
+              K = K.div(K.sum());
+              const mid = size.map(x => Math.floor(x / 2));
+              K = this.roll(K, [0,1,2], mid);
+              K = K.cast('complex64');
+              return this.fftn(K);
+            });
+            this.kernel.assign(dummy);
+            dummy.dispose();
+          }
         map(arr,tensor){
             const tensorarr = tensor.dataSync()
             const mappedarr  = tensorarr.map(x=>arr[x])
             tensor.dispose()
             return tf.tensor(mappedarr, tensor.shape);
             }
-        roll(grid, axis, shift) {
+        roll(grid, axes, shifts) {
             return tf.tidy(() => {
-                const grid_size = tf.tensor(grid.shape).gather(axis).dataSync();
-                const limits = [grid_size[0]-shift[0], grid_size[1]-shift[1], grid_size[2]-shift[2]];
-                const [a1, b1] = tf.split(grid, [limits[0], shift[0]], axis[0]);
-                const x1 = tf.concat([b1,a1],axis[0]);
-                const [a2, b2] = tf.split(x1, [limits[1], shift[1]], axis[1]);
-                const x2 = tf.concat([b2,a2],axis[1])
-                const [a3, b3] = tf.split(x2, [limits[2], shift[2]], axis[2]);
-            return  tf.concat([b3,a3],axis[2])})
+                let result = grid;
+                axes.forEach((axis, i) => {
+                    const size = result.shape[axis];
+                    const shift = shifts[i];
+                    
+                    // Calculate effective shift (handles negative and overshift values)
+                    const effectiveShift = ((shift % size) + size) % size;
+                    if (effectiveShift === 0) return;  // Skip if no actual shift
+                    
+                    // Split and concatenate
+                    const splitPoint = size - effectiveShift;
+                    const [a, b] = tf.split(result, [splitPoint, effectiveShift], axis);
+                    result = tf.concat([b, a], axis);
+                });
+                return result;
+            });
         }
         resize(grid,size){
             if (grid.dtype === 'complex64'){
@@ -320,7 +318,7 @@ const gl = customCanvas.getContext('webgl2');
                 const new_grid = tf.mul(randomGrid,randomBoolGrid)
                 return tf.cast(this.resize(new_grid,this.lenia.size),'float32')})
             this.grid.assign(new_grid)
-            this.lenia.renderUpdate()
+            this.lenia.mesh.render()
             new_grid.dispose()
         }
         generateRandomGrid(){
@@ -328,7 +326,7 @@ const gl = customCanvas.getContext('webgl2');
             this.lenia.time = 0;
             this.lenia.gen = 0;
             this.randomGrid();
-            this.lenia.renderUpdate();
+            this.lenia.mesh.render();
             /*
             this.lenia.UI.updateseed()*/
         }
@@ -362,22 +360,50 @@ const gl = customCanvas.getContext('webgl2');
             this.grid.assign(dummy)
             tf.dispose([complexgrid,fftngrid,potential_FFT,complexU,U,field,scalarfield,grid_new,dummy])
             }
-        zoom(Tensor,zoom){
-            return tf.tidy(()=>{
-            const shape = Tensor.shape
-            const zoomedshape = shape.slice(1).map(x => Math.round(x*zoom))
-            const index = tf.range(0,shape[0],1).reshape([1,1,shape[0],1])
-            Tensor = Tensor.reshape([shape[0],1,...shape.slice(1),1])
-            let zoomedindex = tf.image.resizeNearestNeighbor(index,[1,Math.round(zoom*shape[0])], { alignCorners: true })
-            zoomedindex = zoomedindex.flatten().arraySync()
-            let output = []
-            for (let i=0;i<zoomedindex.length;i++){
-                    let zoomed2d = tf.image.resizeNearestNeighbor(Tensor.gather(zoomedindex[i]),zoomedshape, { alignCorners: true })
-                zoomed2d = zoomed2d.reshape(zoomedshape)
-                output.push(zoomed2d)
+            repeatAlongAxis(tensor, axis, repeats) {
+                return tf.tidy(() => {
+                    // Input validation
+                    if (!(tensor instanceof tf.Tensor)) {
+                        throw new Error('repeatAlongAxis: Input must be a Tensor');
+                    }
+                    if (typeof axis !== 'number' || !Number.isInteger(axis)) {
+                        throw new Error('repeatAlongAxis: axis must be an integer');
+                    }
+                    if (axis < 0 || axis >= tensor.rank) {
+                        throw new Error(`repeatAlongAxis: axis out of bounds (0-${tensor.rank - 1}), got ${axis}`);
+                    }
+                    if (typeof repeats !== 'number' || !Number.isInteger(repeats) || repeats < 1) {
+                        throw new Error('repeatAlongAxis: repeats must be a positive integer');
+                    }
+            
+                    const expanded = tensor.expandDims(axis + 1);
+                    const tiling = new Array(expanded.rank).fill(1);
+                    tiling[axis + 1] = repeats;
+                    const tiled = expanded.tile(tiling);
+                    const newShape = [...tensor.shape];  // Create a copy
+                    newShape[axis] *= repeats;
+                    
+                    return tiled.reshape(newShape);
+                });
             }
-            output = tf.stack(output)
-            return output})}
+            
+            zoom(tensor, zoom) {
+                return tf.tidy(() => {
+                    // Input validation
+                    if (!(tensor instanceof tf.Tensor)) {
+                        throw new Error('zoom: Input must be a Tensor');
+                    }
+                    if (typeof zoom !== 'number' || !Number.isInteger(zoom) || zoom < 1) {
+                        throw new Error('zoom: zoom factor must be a positive integer');
+                    }
+            
+                    let currentTensor = tensor;
+                    for (let i = 0; i < tensor.rank; i++) {
+                        currentTensor = this.repeatAlongAxis(currentTensor, i, zoom);
+                    }
+                    return currentTensor;
+                });
+            }
         Condense(){
             return tf.tidy(()=>{ 
                 const Zaxis = this.grid.shape[0]
@@ -394,6 +420,35 @@ const gl = customCanvas.getContext('webgl2');
 
 
         }
+        applyColormap(matrix) {
+            return tf.tidy(() => {
+            const colourbarmax = tf.tensor1d([253 / 255, 232 / 255, 64 / 255]);
+            const colourbarmin = tf.tensor1d([68 / 255, 13 / 255, 84 / 255]); 
+            const backgroundColor = tf.tensor1d([25,25,26]);
+            const expandedMatrix = matrix.expandDims(-1);
+            const mask = tf.greater(expandedMatrix ,0)
+            const background = tf.mul(tf.equal(mask,0),backgroundColor)
+            const diff = colourbarmax.sub(colourbarmin);
+            const rgbTensor = expandedMatrix.mul(diff).add(colourbarmin);
+            
+        
+            return tf.add(tf.mul(rgbTensor,mask),background)});
+        }
+        rgb2rgba(rgb){
+            return tf.tidy(() => {
+            const squeezed = rgb.shape.length === 4 ? tf.squeeze(rgb) : rgb; // remove batch dim if present
+            const [r, g, b] = tf.split(squeezed, 3, 2); // split rgb into separate tensors
+            const alpha = tf.ones([squeezed.shape[0], squeezed.shape[1], 1], 'float32'); // create alpha channel tensor once // note its only done once so tensor shape must be constant
+            const rgba = tf.stack([r, g, b, alpha], 2); // restack r+g+b+alpha to rgba
+            tf.dispose([squeezed, r, g, b]);
+            return rgba;})
+        }
+        g2rgba(g){
+        return tf.tidy(() => {    
+        const rgb = this.applyColormap(g)
+        return this.rgb2rgba(rgb)})
+        }
+
     }
 
         class mesh {
@@ -407,7 +462,9 @@ const gl = customCanvas.getContext('webgl2');
             // Camera parameters
             this.cameraPos = [100, 100, 100];
             this.cameraTarget = this.volumeDims.map(x => x / 2);
-            this.fovV = 45;   
+            this.fov = 45;   
+            const halfFovTan = Math.tan((this.fov* Math.PI) / 180 / 2);
+            this.sxy = [halfFovTan, halfFovTan]; 
             this.width  = this.canvas.width;
             this.height = this.canvas.height;
             // Orbital control parameters
@@ -565,42 +622,43 @@ const gl = customCanvas.getContext('webgl2');
                         float tFar = min(min(t2.x, t2.y), t2.z);
                         return vec2(tNear, tFar);
                     }
-        
-                    float sampleVolume(vec3 pos) {
-                        ivec3 voxelCoord = ivec3(pos);
-                        int X = int(volumeDims.x);
-                        int Y = int(volumeDims.y);
-                        int Z = int(volumeDims.z);
-        
-                        // Calculate packed texture parameters
-                        int texNumR = Z * (X / 2);
-                        int texNumC = Y / 2;
-                        int texelsInBatch = (X / 2) * (Y / 2);
-                        int texelsInLogicalRow = Y / 2;
-        
-                        vec2 uv = packedUVfrom3D(
-                            texNumR,
-                            texNumC,
-                            texelsInBatch,
-                            texelsInLogicalRow,
-                            voxelCoord.x,
-                            voxelCoord.y,
-                            voxelCoord.z
-                        );
-        
-                        return sampleTexture(volumeData, uv);
+                     float getChannel(vec4 frag, ivec2 innerCoord) {
+                        // Same as before - correct channel mapping
+                        if (innerCoord.x == 0) {
+                            return (innerCoord.y == 0) ? frag.r : frag.g;
+                        } else {
+                            return (innerCoord.y == 0) ? frag.g : frag.g;
+                        }
                     }
-        
-                    vec3 computeRayDirection(vec2 coords, vec2 resolution, vec2 sxy, vec3 f, vec3 r, vec3 u) {
-                        vec2 normcoords = coords / (resolution - 1.0);
-                        vec2 ndc = vec2(
-                        (2.0 * normcoords.x - 1.0),
+
+                float sampleVolume(vec3 pos) {
+                    ivec3 voxelCoord = ivec3(pos);
+                    int X = int(volumeDims.x);
+                    int Y = int(volumeDims.y);
+                    int Z = int(volumeDims.z);
+
+                    // Calculate UVs with proper scaling for odd dimensions
+                    float u = (float(voxelCoord.x) + 0.5) / float(X); // Directly map X to [0,1]
+                    float v = (float(voxelCoord.z * Y + voxelCoord.y) + 0.5) / float(Y * Z); // Flatten Y and Z
+
+                    return texture(volumeData, vec2(u, v)).r;
+                }
+               vec3 computeRayDirection(vec2 coords, vec2 resolution, vec2 sxy, vec3 f, vec3 r, vec3 u) {
+                    // Center pixel coordinates by adding 0.5 before normalization
+                    vec2 normcoords = (coords + 0.5) / resolution;
+                    
+                    // Create aspect ratio-corrected normalized device coordinates
+                    float aspect = resolution.x / resolution.y;
+                    vec2 ndc = vec2(
+                        (2.0 * normcoords.x - 1.0) * aspect,  // Apply aspect ratio to X coordinate
                         (1.0 - 2.0 * normcoords.y)
-                        );
-                        vec2 sndc = ndc * sxy;
-                        return sndc.x*r+sndc.y*u+f;
-                    }
-        
+                    );
+                    
+                    // Scale by FOV factors and combine basis vectors
+                    vec2 sndc = ndc * sxy;
+                    return normalize(sndc.x * r + sndc.y * u + f);
+                }
+                        
                     void main() {
                         ivec2 outputCoords = getOutputCoords();
 
@@ -617,7 +675,7 @@ const gl = customCanvas.getContext('webgl2');
                         t.x = max(t.x, 0.0);
                         vec3 v = ro + rd * t.x;
                         vec3 rdSign = sign(rd);
-                        vec3 tDelta = abs(1.0 / (rd + 1e-6));
+                        vec3 tDelta = 1.0 / abs(rd);
                         vec3 s = (rdSign * (floor(v) - v + 0.5) + 0.5) * tDelta;
 
                         float tcurr = 0.0;
@@ -625,9 +683,8 @@ const gl = customCanvas.getContext('webgl2');
                             // Determine the next voxel boundary to hit
                             vec3 mask = vec3(lessThanEqual(s, min(s.yzx, s.zxy)));
                             float nextStep = min(min(s.x, s.y), s.z);
-                            
-                            // Compute the current voxel's position (centered at 0.5)
-                            vec3 voxelPos = floor(v) + 0.5;
+                        
+                            vec3 voxelPos =  floor(v + 1e-6) + 0.5;;
                             
                             // Sample the volume at the current voxel position.
                             float samplev = sampleVolume(voxelPos);
@@ -668,21 +725,8 @@ const gl = customCanvas.getContext('webgl2');
                     this.width = this.canvas.width;
                     this.height = this.canvas.height;
                     
-                    // Aspect ratio (width/height)
-                    this.aspectRatio = this.width / this.height;
-                    
-                    // Vertical FOV in radians
-                    const fovVRadians = (this.fovV * Math.PI) / 180;  // Renamed to fovV
-                    const halfVFovTan = Math.tan(fovVRadians / 2);
-                    
-                    // Horizontal scale based on aspect ratio
-                    const halfHFovTan = halfVFovTan * this.aspectRatio;
-                    
-                    // [horizontal, vertical] scaling factors
-                    this.sxy = [halfVFovTan, halfHFovTan];  // Order fixed
                 }
             }
-
             updateVectors() {
         // Compute forward = (target - position).normalized
         this.forward = this.normalize([
@@ -774,66 +818,76 @@ const gl = customCanvas.getContext('webgl2');
                 ]
                 );
             }
-            applyColormap(matrix) {
-                return tf.tidy(() => {
-                const colourbarmax = tf.tensor1d([253 / 255, 232 / 255, 64 / 255]);
-                const colourbarmin = tf.tensor1d([68 / 255, 13 / 255, 84 / 255]); 
-                const backgroundColor = tf.tensor1d([25,25,26]);
-                // Expand the matrix to [n, m, 1] for broadcasting
-                const expandedMatrix = matrix.expandDims(-1);
-                const mask = tf.greater(expandedMatrix ,0)
-                const background = tf.mul(tf.equal(mask,0),backgroundColor)
-            
-                // Compute the interpolated RGB values
-                const diff = colourbarmax.sub(colourbarmin);
-                const rgbTensor = expandedMatrix.mul(diff).add(colourbarmin);
-                
-            
-                return tf.add(tf.mul(rgbTensor,mask),background)});
-            }
-            rgb2rgba(rgb){
-                const squeezed = rgb.shape.length === 4 ? tf.squeeze(rgb) : rgb; // remove batch dim if present
-                const [r, g, b] = tf.split(squeezed, 3, 2); // split rgb into separate tensors
-                const alpha = tf.ones([squeezed.shape[0], squeezed.shape[1], 1], 'float32'); // create alpha channel tensor once // note its only done once so tensor shape must be constant
-                const rgba = tf.stack([r, g, b, alpha], 2); // restack r+g+b+alpha to rgba
-                tf.dispose([squeezed, r, g, b]);
-                return rgba;
-            }
-            g2rgba(g){
-            const rgb = this.applyColormap(g)
-            return this.rgb2rgba(rgb)
-            }
             async render() {
             this.onResize()
             // Wrap the computations in a tf.tidy so that every temporary tensor is automatically disposed.
             let processer;
-            tf.tidy(() => {
-                // Remove the unused volumeData creation. (If you really need to create a volume tensor here,
-                // be sure to dispose it when no longer needed.)
-                // const volumeData = tf.ones(this.volumeDims);
-                // Note: We use this.volumeData (assumed to be long-lived) instead of creating a new one.
-                const output = this.volumeRayMarchOp(
-                this.volumeData,
-                this.volumeDims,
-                this.cameraPos,
-                [this.height,this.width],
-                this.sxy,
-                this.forward,
-                this.right,
-                this.up
-                );
-            
-                const rgbaTensor = this.g2rgba(output);
-            
+            if (this.lenia.render === "3D") {
+                const output = tf.tidy(() => {
+                    return this.volumeRayMarchOp(
+                        this.volumeData,
+                        this.volumeDims,
+                        this.cameraPos,
+                        [this.height, this.width],
+                        this.sxy,
+                        this.forward,
+                        this.right,
+                        this.up
+                    );
+                });
+                const rgbaTensor = this.lenia.tensor.g2rgba(output);
                 const gpuData = rgbaTensor.dataToGPU({ customTexShape: [this.height,this.width] });
-            
-                processer = drawTexture(customCanvas, gpuData.texture, { format: 'rgba' });
-            
-            });
-            
-            // Wait for WebGL to sync before finishing render.
-            await syncWait(processer.gl);
-            
+                processer = drawTexture(customCanvas, gpuData.texture, { format: 'rgba' });;
+
+                // Wait for WebGL to sync before finishing render.
+                await syncWait(processer.gl);
+                tf.dispose([output,rgbaTensor,gpuData])
+            } else if (this.lenia.render === "2D") {
+                const output = this.lenia.tensor.Condense();
+                const doutput = this.Dimage(output)
+
+                const rgbaTensor = this.lenia.tensor.g2rgba(doutput);
+
+                const gpuData = rgbaTensor.dataToGPU({ customTexShape: [this.height,this.width] });
+
+                processer = drawTexture(customCanvas, gpuData.texture, { format: 'rgba' });;
+
+                // Wait for WebGL to sync before finishing render.
+                await syncWait(processer.gl);
+                tf.dispose([output,zoomed,rgbaTensor,gpuData])
+    
+            }
+            }
+            Dimage(output){
+                const [_,leniaHeight,leniaWidth] = this.lenia.size; 
+                const resolution = [this.canvas.clientHeight,this.canvas.clientWidth]
+                console.log('resolution',resolution[1]/resolution[0])
+                const leniaresolution = [leniaHeight,leniaWidth]
+
+                const scaling = resolution.map((x,i)=>x/leniaresolution[i])
+                const sortedScalingIndices = scaling.map((_, i) => i).sort((a, b) => scaling[a] - scaling[b]);
+                const [smallerScaleIndex, largerScaleIndex] = sortedScalingIndices;
+                const additionalScale = resolution[largerScaleIndex]/resolution[smallerScaleIndex];
+                const scaledDim = leniaresolution[smallerScaleIndex]*additionalScale
+                const Dimension = ['height','width']
+                this.canvas[Dimension[smallerScaleIndex]] = this.lenia.size[smallerScaleIndex]
+                this.canvas[Dimension[largerScaleIndex]] = Math.floor(scaledDim)
+                this.height = this.canvas.height
+                this.width = this.canvas.width
+
+                const tilingFactors = [1, 1];
+                tilingFactors[largerScaleIndex] = Math.ceil(additionalScale);
+                console.log('tilingFactor',tilingFactors)
+                const tiledOutput = output.tile(tilingFactors);
+                const shift = [0, 0].map((x, i) => {
+                    if (i === largerScaleIndex) {
+                      return Math.floor(scaledDim / 2);
+                    }
+                    return x;
+                  });
+                const rolledOutput = this.lenia.tensor.roll(tiledOutput,[0,1],shift)
+                return tf.slice2d(rolledOutput,[0,0],[this.lenia.size[smallerScaleIndex],Math.floor(scaledDim)])
+
             }
 
             normalize(v) {
@@ -870,120 +924,6 @@ const gl = customCanvas.getContext('webgl2');
 
 
         }
-    class array {
-        constructor(lenia) {
-            this.lenia = lenia;
-            this.canvas = document.getElementById('canvas-2d');
-            this.ctx = this.canvas.getContext('2d');
-            this.renderBoundsPotential = null;
-            this.renderBoundsDirection = null;
-            this.shouldRenderBounds = false;
-            this.cellSize= 16;
-            window.addEventListener('resize', () => this.update());
-        }
-
-        render() {
-            this.ctx.setTransform(1, 0, 0, 1, 0, 0);
-            this.canvas.width = this.cellRows * this.cellSize
-            this.canvas.height = this.cellCols * this.cellSize
-            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.width);
-
-
-            if (this.shouldRenderBounds) {
-                this.renderBounds();
-            }
-
-            let rowStart = null, rowEnd = null, colStart = null, colEnd = null;
-
-            if (this.shouldRenderBounds){
-                rowStart =  this.offset[0];
-                rowEnd = this.x + this.offset[0];
-                colStart = this.offset[1];
-                colEnd = this.y + this.offset[1];
-            }
-            else{ rowStart = 0; rowEnd = this.cellRows; colStart = 0; colEnd = this.cellCols; }
-
-
-            // Loop to render cells
-            for (let i =  rowStart; i < rowEnd; i++) {
-                for (let j = colStart; j < colEnd; j++) {
-                    const value = this.values[i * this.cellCols + j]; // Get value from cached array
-                    const color = this.lenia.colormap(value);
-                    const isVisible = value > 1e-18; // Example condition for visibility
-                    
-                    // Set the fill style; if not visible, set to transparent
-                    if (isVisible) {
-                        this.ctx.fillStyle = `rgba(${color[0] * 255}, ${color[1] * 255}, ${color[2] * 255}, 1)`;
-                    } else {
-                        this.ctx.fillStyle = `hsl(0,0%,7%)`;
-                    }
-                    this.ctx.fillRect(i * this.cellSize, j * this.cellSize, this.cellSize, this.cellSize);
-                }
-            }
-        }
-        init(){
-            this.canvas.style.display = 'block';
-            this.x = this.lenia.size[0];
-            this.y = this.lenia.size[1];
-
-        
-        }
-        
-        update() {
-            this.x = this.lenia.size[2];
-            this.y = this.lenia.size[1];
-            /* this.cellSize = Math.min(this.canvas.clientHeight, this.canvas.clientWidth) / Math.max(this.x, this.y)   /*/
-            let relativeSize = null
-            if (this.shouldRenderBounds){relativeSize = Math.min(this.canvas.clientHeight, this.canvas.clientWidth) / 128}
-            else {relativeSize = Math.min(this.canvas.clientHeight, this.canvas.clientWidth) / Math.max(this.x, this.y);}
-            this.cellRows = Math.floor(this.canvas.clientWidth / relativeSize);
-            this.cellCols = Math.floor(this.canvas.clientHeight / relativeSize);
-        
-
-            this.offset = [Math.floor((this.cellRows - this.x) / 2), Math.floor((this.cellCols - this.y) / 2)]
-            const arrayIndices = Array.from({ length: this.cellRows * this.cellCols }, (_, index) => {
-                const i = Math.floor(index / this.cellCols);
-                const j = index % this.cellCols;
-                return [(i+this.offset[0]) % this.y, (j+this.offset[1]) % this.x]; // Apply modulus to fit within array bounds
-            });
-            this.values = tf.tidy(() => {
-                let array = this.lenia.tensor.Condense();
-                const tfArrayIndices = tf.tensor(arrayIndices, null, 'int32');
-                const values = tf.gatherND(array, tfArrayIndices);
-                const valuesArray = values.arraySync();
-                return valuesArray;
-            });
-            this.render();
-        }
-        remove() {
-            this.canvas.style.display = 'none';
-            this.ctx.clearRect(0, 0, this.canvas.clientWidth/this.scale, this.canvas.clientHeight/this.scale);
-        }
-        renderBounds() {
-            this.ctx.fillStyle = 'rgba(242, 242, 242, 0.25)';
-            const size = this.lenia.size.map((dim, i) => (i === this.renderBoundsDirection ? this.renderBoundsPotential : dim));
-            const offset = [Math.floor((this.cellRows - size[0]) / 2), Math.floor((this.cellCols - size[1]) / 2)];
-            this.ctx.fillRect(offset[0] * this.cellSize, offset[1] * this.cellSize, size[0] * this.cellSize, size[1] * this.cellSize);
-            this.ctx.strokeStyle = 'rgba(242, 242, 242, 0.75)';
-            this.ctx.lineWidth = this.cellsize*2;
-            this.ctx.strokeRect(this.offset[0] * this.cellSize, this.offset[1] * this.cellSize, this.x * this.cellSize, this.y * this.cellSize);
-
-
-        }
-        removeBounds() {
-            this.shouldRenderBounds = false;
-            this.renderBoundsDirection = null;
-            this.renderBoundsPotential = null;
-            this.update();
-        }
-        updateGridSize() {
-            this.removeBounds();
-            this.update();
-            this.x = this.lenia.size[2];
-            this.y = this.lenia.size[1];
-        }
-    }
-
     class UI{
         constructor(lenia){
         this.lenia = lenia
@@ -1185,7 +1125,6 @@ const gl = customCanvas.getContext('webgl2');
         }
 
         toggleRenderDimension(button) {
-            this.lenia.renderRemove();
             const D = button.innerText
             button.style.backgroundColor = "hsl(var(--primary))";
             button.style.color = "hsl(var(--foreground))"
@@ -1195,7 +1134,7 @@ const gl = customCanvas.getContext('webgl2');
             otherButton.style.backgroundColor = "hsl(var(--muted))"
             otherButton.style.color = "hsl(var(--muted-foreground))"
             this.lenia.render = button.innerText
-            this.lenia.renderInit();
+            this.lenia.mesh.render();
         }
 
         validateData(value, type, slice = 0) {
@@ -1686,7 +1625,6 @@ const gl = customCanvas.getContext('webgl2');
             this.lenia.params = Object.assign({}, a['params'])
             this.lenia.params['b'] = this.st2fracs(this.lenia.params['b'])
             dummy.dispose();
-            this.lenia.renderUpdate()
             this.lenia.UI.updateparams()
             /*
             this.lenia.UI.updatename()*/

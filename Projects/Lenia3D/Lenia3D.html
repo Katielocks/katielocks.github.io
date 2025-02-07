@@ -190,8 +190,7 @@
           </div>
         </div>  
 
-        <canvas id="canvas-2d" class="canvas"></canvas>
-        <canvas id="canvas-3d" class="canvas"></canvas>  
+        <canvas id="canvas" class="canvas"></canvas>  
         <div id = sim-bottombar class = "bottom-bar">
           <div id="playcontrol" class="play-controls">
             <label id="play-button" class="play-button">
@@ -208,7 +207,6 @@
   </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs/dist/tf.min.js"> </script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgpu/dist/tf-backend-webgpu.js"></script>
 
 <script type="module">
   import { Lenia } from './dist/lenia.js';
@@ -223,7 +221,7 @@
     window.lenia.tensor.generateKernel();
   }
   
-  window.lenia.renderUpdate(true);
+  window.lenia.mesh.render();
 </script>
 </body>
 </html>

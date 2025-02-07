@@ -1076,7 +1076,7 @@ input[type="range"]:focus::-moz-range-thumb {
   ********************************************************/
  .canvas {
    position: absolute;
-   display: none;
+   display: block;
    width: 100%;
    height: 100%;
  }
