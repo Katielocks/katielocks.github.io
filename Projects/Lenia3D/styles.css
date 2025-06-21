@@ -1065,7 +1065,8 @@ input[type="range"]:focus::-moz-range-thumb {
 /* Modal card */
 .info-modal {
   position: relative; /* ensures close button is anchored correctly */
-  max-width: 400px;
+    max-height : 80%;
+    max-width: calc(80vh * 0.8);
   background: hsl(var(--popover));
   color: hsl(var(--popover-foreground));
   padding: 1.25rem 1.5rem 1.5rem; /* extra top‑padding for the X */
